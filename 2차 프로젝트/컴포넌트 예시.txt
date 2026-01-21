@@ -1,0 +1,12 @@
+# 컴포넌트
+Header
+SearchBar
+CategoryTabs
+FilterBar
+ProductGride
+ProductCard
+ErrorState
+EmptyState
+
+# 메인 페이지
+헤더

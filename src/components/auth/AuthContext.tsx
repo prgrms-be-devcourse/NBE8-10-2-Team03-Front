@@ -7,6 +7,7 @@ export type MemberMe = {
   username: string;
   name: string;
   score: number;
+  apiKey?: string;
   createDate: string;
   modifyDate: string;
 };

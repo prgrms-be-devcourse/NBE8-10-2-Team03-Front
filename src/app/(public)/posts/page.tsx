@@ -13,6 +13,7 @@ type PostItem = {
   categoryName: string;
   thumbnailUrl?: string;
   createDate: string;
+  viewCount: number;
 };
 
 type PostPageData = {
@@ -33,6 +34,7 @@ export default function PostsPage() {
   const [keyword, setKeyword] = useState("");
   const [sort, setSort] = useState("LATEST");
   const [page, setPage] = useState(0);
+  const pageSize = 10;
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [totalPages, setTotalPages] = useState<number | null>(null);
   const [totalElements, setTotalElements] = useState<number | null>(null);
@@ -52,9 +54,16 @@ export default function PostsPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch(buildApiUrl(`/api/v1/posts?page=${page}`), {
-          credentials: "include",
-        });
+        const params = new URLSearchParams();
+        params.set("page", String(page));
+        params.set("size", String(pageSize));
+        if (sort === "LATEST") {
+          params.set("sort", "createDate,desc");
+        }
+        const response = await fetch(
+          buildApiUrl(`/api/v1/posts?${params.toString()}`),
+          { credentials: "include" }
+        );
         const { rsData, errorMessage: apiError } =
           await parseRsData<PostPageData>(response);
         if (!isMounted) return;
@@ -159,7 +168,8 @@ export default function PostsPage() {
                 <div className="tag">{post.categoryName}</div>
                 <h3 style={{ margin: "12px 0 6px" }}>{post.title}</h3>
                 <div className="muted">
-                  {formatNumber(post.price)}원 · {post.createDate}
+                  {formatNumber(post.price)}원 · {post.createDate} · 조회{" "}
+                  {formatNumber(post.viewCount)}
                 </div>
               </Link>
             ))}

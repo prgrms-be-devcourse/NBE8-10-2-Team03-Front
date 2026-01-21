@@ -20,6 +20,7 @@ export default function MyPage() {
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [nicknameSuccess, setNicknameSuccess] = useState<string | null>(null);
   const [isNicknameLoading, setIsNicknameLoading] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -104,8 +105,18 @@ export default function MyPage() {
 
   const handlePasswordSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newPassword || !confirmPassword) {
+    if (!currentPassword) {
+      setPasswordError("현재 비밀번호를 입력해 주세요.");
+      setPasswordSuccess(null);
+      return;
+    }
+    if (!newPassword) {
       setPasswordError("새 비밀번호를 입력해 주세요.");
+      setPasswordSuccess(null);
+      return;
+    }
+    if (!confirmPassword) {
+      setPasswordError("새 비밀번호 확인을 입력해 주세요.");
       setPasswordSuccess(null);
       return;
     }
@@ -122,16 +133,22 @@ export default function MyPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ password: newPassword }),
+        body: JSON.stringify({
+          password: currentPassword,
+          newPassword,
+          checkPassword: confirmPassword,
+        }),
       });
       const { rsData, errorMessage: apiError } =
         await parseRsData<unknown>(response);
       if (!response.ok || apiError || !rsData) {
         setPasswordError(apiError || "비밀번호 수정에 실패했습니다.");
+        setPasswordSuccess(null);
         return;
       }
       setNewPassword("");
       setConfirmPassword("");
+      setCurrentPassword("");
       setPasswordSuccess(rsData.msg || "비밀번호가 수정되었습니다.");
     } catch {
       setPasswordError("네트워크 오류가 발생했습니다.");
@@ -219,6 +236,25 @@ export default function MyPage() {
           <h2 style={{ marginTop: 0 }}>비밀번호 수정</h2>
           <form onSubmit={handlePasswordSubmit}>
             <div className="field">
+              <label className="label" htmlFor="current-password">
+                현재 비밀번호
+              </label>
+              <input
+                id="current-password"
+                className="input"
+                type="password"
+                value={currentPassword}
+                onChange={(event) => {
+                  setCurrentPassword(event.target.value);
+                  setPasswordError(null);
+                  setPasswordSuccess(null);
+                }}
+                placeholder="current password"
+                autoComplete="current-password"
+                disabled={isPasswordLoading}
+              />
+            </div>
+            <div className="field">
               <label className="label" htmlFor="new-password">
                 새 비밀번호
               </label>
@@ -234,6 +270,7 @@ export default function MyPage() {
                 }}
                 placeholder="new password"
                 autoComplete="new-password"
+                disabled={isPasswordLoading}
               />
             </div>
             <div className="field" style={{ marginTop: 16 }}>
@@ -252,6 +289,7 @@ export default function MyPage() {
                 }}
                 placeholder="confirm new password"
                 autoComplete="new-password"
+                disabled={isPasswordLoading}
               />
             </div>
             {passwordError ? (

@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [nickname, setNickname] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isKakaoLoading, setIsKakaoLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -46,6 +47,12 @@ export default function SignupPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleKakaoSignup = () => {
+    setIsKakaoLoading(true);
+    setErrorMessage(null);
+    window.location.href = buildApiUrl("/oauth2/authorization/kakao");
   };
 
   return (
@@ -105,6 +112,15 @@ export default function SignupPage() {
           style={{ marginTop: 20, width: "100%" }}
         >
           {isLoading ? "가입 중..." : "회원가입"}
+        </button>
+        <button
+          className="btn btn-ghost"
+          type="button"
+          onClick={handleKakaoSignup}
+          disabled={isKakaoLoading}
+          style={{ marginTop: 12, width: "100%" }}
+        >
+          {isKakaoLoading ? "카카오 가입 이동 중..." : "카카오로 시작하기"}
         </button>
       </form>
       <div className="muted" style={{ marginTop: 16 }}>

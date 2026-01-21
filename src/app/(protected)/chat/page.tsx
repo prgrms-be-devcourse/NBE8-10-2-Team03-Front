@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
-import { buildApiUrl, safeJson } from "@/lib/api";
+import { buildApiUrl, parseRsData, safeJson } from "@/lib/api";
 
 type ChatDto = {
   id?: number;
@@ -27,6 +28,7 @@ const toTimestamp = (value?: string) =>
 
 export default function ChatPage() {
   const auth = useAuth();
+  const searchParams = useSearchParams();
   const [chatListRaw, setChatListRaw] = useState<ChatDto[]>([]);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -40,10 +42,19 @@ export default function ChatPage() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [messagesRefreshTick, setMessagesRefreshTick] = useState(0);
 
+  const pendingRoomId = searchParams?.get("roomId");
+  const pendingItemId = searchParams?.get("itemId");
+
   const selectedRoom = useMemo(
     () => rooms.find((room) => room.roomId === selectedRoomId) || null,
     [rooms, selectedRoomId]
   );
+
+  useEffect(() => {
+    if (pendingRoomId && !selectedRoomId) {
+      setSelectedRoomId(pendingRoomId);
+    }
+  }, [pendingRoomId, selectedRoomId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,15 +69,16 @@ export default function ChatPage() {
           setRoomsError("채팅 목록을 불러오지 못했습니다.");
           return;
         }
-        const json = await safeJson<ChatDto[]>(response);
-        if (!json) {
-          setRoomsError("응답 파싱에 실패했습니다.");
+        const { rsData, errorMessage } = await parseRsData<ChatDto[]>(response);
+        if (!rsData) {
+          setRoomsError(errorMessage || "응답 파싱에 실패했습니다.");
           return;
         }
         if (!isMounted) return;
-        setChatListRaw(json);
+        const roomChats = rsData.data || [];
+        setChatListRaw(roomChats);
         const grouped = new Map<string, RoomSummary & { lastAt: number }>();
-        for (const chat of json) {
+        for (const chat of roomChats) {
           const existing = grouped.get(chat.roomId);
           const currentTs = toTimestamp(chat.createDate);
           const unread = chat.isRead ? 0 : 1;
@@ -91,7 +103,25 @@ export default function ChatPage() {
         const sortedRooms = Array.from(grouped.values())
           .sort((a, b) => b.lastAt - a.lastAt)
           .map(({ lastAt, ...room }) => room);
-        setRooms(sortedRooms);
+        if (
+          pendingRoomId &&
+          !sortedRooms.some((room) => room.roomId === pendingRoomId)
+        ) {
+          const parsedItemId = pendingItemId ? Number(pendingItemId) : 0;
+          const itemId = Number.isFinite(parsedItemId) ? parsedItemId : 0;
+          setRooms([
+            {
+              roomId: pendingRoomId,
+              itemId,
+              lastMessage: "새 채팅방",
+              lastMessageAt: "",
+              unreadCount: 0,
+            },
+            ...sortedRooms,
+          ]);
+        } else {
+          setRooms(sortedRooms);
+        }
       } catch {
         if (isMounted) {
           setRoomsError("네트워크 오류가 발생했습니다.");
@@ -106,7 +136,7 @@ export default function ChatPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [pendingRoomId, pendingItemId]);
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -128,13 +158,13 @@ export default function ChatPage() {
           setMessagesError("메시지를 불러오지 못했습니다.");
           return;
         }
-        const json = await safeJson<ChatDto[]>(response);
-        if (!json) {
-          setMessagesError("응답 파싱에 실패했습니다.");
+        const { rsData, errorMessage } = await parseRsData<ChatDto[]>(response);
+        if (!rsData) {
+          setMessagesError(errorMessage || "응답 파싱에 실패했습니다.");
           return;
         }
         if (!isMounted) return;
-        setMessages(json);
+        setMessages(rsData.data || []);
       } catch {
         if (isMounted) {
           setMessagesError("네트워크 오류가 발생했습니다.");
@@ -154,24 +184,40 @@ export default function ChatPage() {
   const handleSend = async () => {
     if (!selectedRoomId || !messageText.trim() || isSending) return;
     const sender =
-      auth?.me?.username || auth?.me?.name || auth?.me?.id?.toString() || "me";
+      auth?.me?.apiKey ||
+      auth?.me?.username ||
+      auth?.me?.name ||
+      auth?.me?.id?.toString() ||
+      "me";
     const itemId = selectedRoom?.itemId ?? 0;
     setIsSending(true);
     setSendError(null);
     try {
+      const formData = new FormData();
+      formData.append("id", "0");
+      formData.append("itemId", itemId.toString());
+      formData.append("roomId", selectedRoomId);
+      formData.append("sender", sender);
+      formData.append("message", messageText.trim());
+      formData.append("createDate", "");
+      formData.append("isRead", "false");
       const response = await fetch(buildApiUrl("/api/chat/send"), {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itemId,
-          roomId: selectedRoomId,
-          sender,
-          message: messageText.trim(),
-        }),
+        body: formData,
       });
       if (!response.ok) {
-        setSendError("메시지 전송에 실패했습니다.");
+        const raw = await response.text();
+        let serverMessage = "";
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as { msg?: string; message?: string };
+            serverMessage = parsed.msg || parsed.message || "";
+          } catch {
+            serverMessage = raw.trim();
+          }
+        }
+        setSendError(serverMessage || "메시지 전송에 실패했습니다.");
         return;
       }
       setMessageText("");
@@ -181,9 +227,9 @@ export default function ChatPage() {
         credentials: "include",
         }
       );
-      const json = await safeJson<ChatDto[]>(refreshed);
-      if (json) {
-        setMessages(json);
+      const { rsData } = await parseRsData<ChatDto[]>(refreshed);
+      if (rsData) {
+        setMessages(rsData.data || []);
       }
     } catch {
       setSendError("네트워크 오류가 발생했습니다.");

@@ -61,6 +61,7 @@ export default function ProtectedLayout({
         setGlobalErrorMessage(errorMessage || "로그아웃에 실패했습니다.");
         return;
       }
+      localStorage.removeItem("buyerApiKey");
       setMe(null);
       setAuthStatus("guest");
       router.replace("/login");

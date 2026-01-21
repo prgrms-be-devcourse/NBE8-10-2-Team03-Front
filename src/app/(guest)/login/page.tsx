@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { buildApiUrl, parseRsData } from "@/lib/api";
+import { buildApiUrl, isSuccessResultCode, safeJson } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isKakaoLoading, setIsKakaoLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -28,11 +29,32 @@ export default function LoginPage() {
         credentials: "include",
         body: JSON.stringify({ username: trimmedUsername, password }),
       });
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<unknown>(response);
-      if (!response.ok || apiError || !rsData) {
-        setErrorMessage(apiError || "로그인에 실패했습니다.");
+      const json = await safeJson<{
+        resultCode?: string;
+        msg?: string;
+        data?: { apiKey?: string };
+        apiKey?: string;
+      }>(response);
+      if (!json) {
+        setErrorMessage("응답 파싱에 실패했습니다.");
         return;
+      }
+      if (json.resultCode) {
+        const isSuccess =
+          response.ok && isSuccessResultCode(json.resultCode);
+        if (!isSuccess) {
+          setErrorMessage(json.msg || "로그인에 실패했습니다.");
+          return;
+        }
+      } else if (!response.ok) {
+        setErrorMessage(json.msg || "로그인에 실패했습니다.");
+        return;
+      }
+      const apiKey = json.data?.apiKey || json.apiKey;
+      if (apiKey) {
+        localStorage.setItem("buyerApiKey", apiKey);
+      } else {
+        localStorage.removeItem("buyerApiKey");
       }
       router.replace("/");
     } catch {
@@ -40,6 +62,12 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleKakaoLogin = () => {
+    setIsKakaoLoading(true);
+    setErrorMessage(null);
+    window.location.href = buildApiUrl("/oauth2/authorization/kakao");
   };
 
   return (
@@ -86,6 +114,15 @@ export default function LoginPage() {
           style={{ marginTop: 20, width: "100%" }}
         >
           {isLoading ? "로그인 중..." : "로그인"}
+        </button>
+        <button
+          className="btn btn-ghost"
+          type="button"
+          onClick={handleKakaoLogin}
+          disabled={isKakaoLoading}
+          style={{ marginTop: 12, width: "100%" }}
+        >
+          {isKakaoLoading ? "카카오 로그인 이동 중..." : "카카오로 로그인"}
         </button>
       </form>
       <div className="muted" style={{ marginTop: 16 }}>
