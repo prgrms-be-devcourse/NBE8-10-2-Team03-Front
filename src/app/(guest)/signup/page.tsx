@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { parseRsData } from "@/lib/api";
+import { buildApiUrl, parseRsData } from "@/lib/api";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -24,7 +24,7 @@ export default function SignupPage() {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const response = await fetch("/api/v1/members", {
+      const response = await fetch(buildApiUrl("/api/v1/members"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

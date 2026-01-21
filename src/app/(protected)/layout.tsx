@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthProvider, type MemberMe } from "@/components/auth/AuthContext";
-import { parseRsData } from "@/lib/api";
+import { buildApiUrl, parseRsData } from "@/lib/api";
 import { fetchMe } from "@/lib/auth";
 
 type AuthStatus = "checking" | "authed" | "guest";
@@ -52,7 +52,7 @@ export default function ProtectedLayout({
     setIsLoggingOut(true);
     setGlobalErrorMessage(null);
     try {
-      const response = await fetch("/api/v1/members/logout", {
+      const response = await fetch(buildApiUrl("/api/v1/members/logout"), {
         method: "DELETE",
         credentials: "include",
       });

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { parseRsData } from "@/lib/api";
+import { buildApiUrl, parseRsData } from "@/lib/api";
 
 type PostItem = {
   id: number;
@@ -47,7 +47,7 @@ export default function PostsPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch(`/api/v1/posts?page=${page}`, {
+        const response = await fetch(buildApiUrl(`/api/v1/posts?page=${page}`), {
           credentials: "include",
         });
         const { rsData, errorMessage: apiError } =

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { parseRsData } from "@/lib/api";
+import { buildApiUrl, parseRsData } from "@/lib/api";
 
 type AuctionItem = {
   auctionId: number;
@@ -61,7 +61,7 @@ export default function AuctionsPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch(`/api/auctions?${buildQuery()}`);
+        const response = await fetch(buildApiUrl(`/api/auctions?${buildQuery()}`));
         const { rsData, errorMessage: apiError } =
           await parseRsData<AuctionPageData>(response);
         if (!isMounted) return;

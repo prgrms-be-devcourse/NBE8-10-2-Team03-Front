@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { safeJson } from "@/lib/api";
+import { buildApiUrl, safeJson } from "@/lib/api";
 
 type ChatDto = {
   id?: number;
@@ -51,7 +51,7 @@ export default function ChatPage() {
       setIsRoomsLoading(true);
       setRoomsError(null);
       try {
-        const response = await fetch("/api/chat/list", {
+        const response = await fetch(buildApiUrl("/api/chat/list"), {
           credentials: "include",
         });
         if (!response.ok) {
@@ -118,9 +118,12 @@ export default function ChatPage() {
       setIsMessagesLoading(true);
       setMessagesError(null);
       try {
-        const response = await fetch(`/api/chat/room/${selectedRoomId}`, {
+        const response = await fetch(
+          buildApiUrl(`/api/chat/room/${selectedRoomId}`),
+          {
           credentials: "include",
-        });
+          }
+        );
         if (!response.ok) {
           setMessagesError("메시지를 불러오지 못했습니다.");
           return;
@@ -156,7 +159,7 @@ export default function ChatPage() {
     setIsSending(true);
     setSendError(null);
     try {
-      const response = await fetch("/api/chat/send", {
+      const response = await fetch(buildApiUrl("/api/chat/send"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -172,9 +175,12 @@ export default function ChatPage() {
         return;
       }
       setMessageText("");
-      const refreshed = await fetch(`/api/chat/room/${selectedRoomId}`, {
+      const refreshed = await fetch(
+        buildApiUrl(`/api/chat/room/${selectedRoomId}`),
+        {
         credentials: "include",
-      });
+        }
+      );
       const json = await safeJson<ChatDto[]>(refreshed);
       if (json) {
         setMessages(json);

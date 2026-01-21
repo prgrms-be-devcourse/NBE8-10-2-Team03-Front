@@ -4,6 +4,16 @@ export type RsData<T> = {
   data: T;
 };
 
+export function buildApiUrl(path: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (!baseUrl) return path;
+  try {
+    return new URL(path, baseUrl).toString();
+  } catch {
+    return path;
+  }
+}
+
 export function isSuccessResultCode(resultCode?: string): boolean {
   if (!resultCode) return false;
   return resultCode.startsWith("200-") || resultCode.startsWith("201-");

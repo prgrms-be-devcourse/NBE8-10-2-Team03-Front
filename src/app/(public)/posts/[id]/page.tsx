@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { parseRsData } from "@/lib/api";
+import { buildApiUrl, parseRsData } from "@/lib/api";
 
 type PostDetail = {
   id: number;
@@ -52,7 +52,7 @@ export default function PostDetailPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch(`/api/v1/posts/${postId}`, {
+        const response = await fetch(buildApiUrl(`/api/v1/posts/${postId}`), {
           credentials: "include",
         });
         const { rsData, errorMessage: apiError } =
@@ -86,7 +86,7 @@ export default function PostDetailPage() {
     setIsDeleting(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(`/api/v1/posts/${postId}`, {
+      const response = await fetch(buildApiUrl(`/api/v1/posts/${postId}`), {
         method: "DELETE",
         credentials: "include",
       });

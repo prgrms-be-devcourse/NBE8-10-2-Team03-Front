@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { parseRsData } from "@/lib/api";
+import { buildApiUrl, parseRsData } from "@/lib/api";
 
 type PostPreview = {
   id: number;
@@ -35,8 +35,8 @@ export default function MainPage() {
       setErrorMessage(null);
       try {
         const [postsRes, auctionsRes] = await Promise.all([
-          fetch("/api/v1/posts?page=0", { credentials: "include" }),
-          fetch("/api/auctions?status=OPEN&page=0&size=4", {
+          fetch(buildApiUrl("/api/v1/posts?page=0"), { credentials: "include" }),
+          fetch(buildApiUrl("/api/auctions?status=OPEN&page=0&size=4"), {
             credentials: "include",
           }),
         ]);

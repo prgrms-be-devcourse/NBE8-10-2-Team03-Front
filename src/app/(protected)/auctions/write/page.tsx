@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { parseFieldErrors, parseRsData } from "@/lib/api";
+import { buildApiUrl, parseFieldErrors, parseRsData } from "@/lib/api";
 
 export default function AuctionWritePage() {
   const router = useRouter();
@@ -84,7 +84,7 @@ export default function AuctionWritePage() {
     form.images.forEach((file) => body.append("images", file));
 
     try {
-      const response = await fetch("/api/auctions", {
+      const response = await fetch(buildApiUrl("/api/auctions"), {
         method: "POST",
         credentials: "include",
         body,

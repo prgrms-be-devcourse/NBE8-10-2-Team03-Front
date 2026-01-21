@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { parseRsData } from "@/lib/api";
+import { buildApiUrl, parseRsData } from "@/lib/api";
 
 type AuctionDetail = {
   auctionId: number;
@@ -48,7 +48,7 @@ export default function AuctionDetailPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch(`/api/auctions/${auctionId}`);
+        const response = await fetch(buildApiUrl(`/api/auctions/${auctionId}`));
         const { rsData, errorMessage: apiError } =
           await parseRsData<AuctionDetail>(response);
         if (!isMounted) return;

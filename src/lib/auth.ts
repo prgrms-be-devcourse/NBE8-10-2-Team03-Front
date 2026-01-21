@@ -1,4 +1,4 @@
-import { safeJson } from "@/lib/api";
+import { buildApiUrl, safeJson } from "@/lib/api";
 import type { MemberMe } from "@/components/auth/AuthContext";
 
 export async function fetchMe(): Promise<{
@@ -7,7 +7,7 @@ export async function fetchMe(): Promise<{
   errorMessage: string | null;
 }> {
   try {
-    const response = await fetch("/api/v1/members/me", {
+    const response = await fetch(buildApiUrl("/api/v1/members/me"), {
       method: "GET",
       credentials: "include",
     });

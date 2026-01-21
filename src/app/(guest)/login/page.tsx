@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { parseRsData } from "@/lib/api";
+import { buildApiUrl, parseRsData } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const response = await fetch("/api/v1/members/login", {
+      const response = await fetch(buildApiUrl("/api/v1/members/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

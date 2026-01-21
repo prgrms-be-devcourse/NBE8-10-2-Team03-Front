@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { parseFieldErrors, parseRsData } from "@/lib/api";
+import { buildApiUrl, parseFieldErrors, parseRsData } from "@/lib/api";
 
 export default function PostWritePage() {
   const router = useRouter();
@@ -61,7 +61,7 @@ export default function PostWritePage() {
     form.images.forEach((file) => body.append("images", file));
 
     try {
-      const response = await fetch("/api/v1/posts", {
+      const response = await fetch(buildApiUrl("/api/v1/posts"), {
         method: "POST",
         credentials: "include",
         body,

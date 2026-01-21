@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { safeJson } from "@/lib/api";
+import { buildApiUrl, safeJson } from "@/lib/api";
 
 type MemberMe = {
   id: number;
@@ -23,7 +23,7 @@ export default function MyPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch("/api/v1/members/me", {
+        const response = await fetch(buildApiUrl("/api/v1/members/me"), {
           method: "GET",
           credentials: "include",
         });
