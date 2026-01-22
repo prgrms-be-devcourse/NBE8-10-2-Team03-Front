@@ -4,6 +4,12 @@ export type RsData<T> = {
   data: T;
 };
 
+export type ApiResult<T> = {
+  rsData: RsData<T> | null;
+  errorMessage: string | null;
+  response: Response;
+};
+
 export function buildApiUrl(path: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (!baseUrl) return path;
@@ -44,6 +50,18 @@ export async function parseRsData<T>(response: Response): Promise<{
     return { rsData: json, errorMessage: json.msg || "요청에 실패했습니다." };
   }
   return { rsData: json, errorMessage: null };
+}
+
+export async function apiRequest<T>(
+  path: string,
+  init: RequestInit = {}
+): Promise<ApiResult<T>> {
+  const response = await fetch(buildApiUrl(path), {
+    ...init,
+    credentials: init.credentials ?? "include",
+  });
+  const { rsData, errorMessage } = await parseRsData<T>(response);
+  return { rsData, errorMessage, response };
 }
 
 export function parseFieldErrors(msg: string): Record<string, string> {

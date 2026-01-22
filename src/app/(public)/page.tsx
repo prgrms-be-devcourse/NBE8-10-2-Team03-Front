@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { buildApiUrl, parseRsData } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { getAuctionStatusLabel } from "@/lib/status";
 
 type PostPreview = {
   id: number;
@@ -39,18 +44,12 @@ export default function MainPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const [postsRes, auctionsRes] = await Promise.all([
-          fetch(buildApiUrl("/api/v1/posts?page=0"), { credentials: "include" }),
-          fetch(buildApiUrl("/api/auctions?status=OPEN&page=0&size=4"), {
-            credentials: "include",
-          }),
+        const [postsParsed, auctionsParsed] = await Promise.all([
+          apiRequest<{ content?: PostPreview[] }>("/api/v1/posts?page=0"),
+          apiRequest<{ content?: AuctionPreview[] }>(
+            "/api/auctions?status=OPEN&page=0&size=4"
+          ),
         ]);
-        const postsParsed = await parseRsData<{
-          content?: PostPreview[];
-        }>(postsRes);
-        const auctionsParsed = await parseRsData<{
-          content?: AuctionPreview[];
-        }>(auctionsRes);
         if (!isMounted) return;
         if (postsParsed.rsData && !postsParsed.errorMessage) {
           setRecentPosts(postsParsed.rsData.data?.content ?? []);
@@ -106,15 +105,15 @@ export default function MainPage() {
 
       <section style={{ marginTop: 28 }}>
         <div className="grid-2">
-          <div className="card">
+          <Card>
             <h2 style={{ marginTop: 0 }}>최신 중고거래</h2>
             {isLoading ? (
               <>
-                <div className="skeleton" style={{ width: "60%" }} />
-                <div className="skeleton" style={{ width: "80%", marginTop: 12 }} />
+                <SkeletonLine width="60%" />
+                <SkeletonLine width="80%" style={{ marginTop: 12 }} />
               </>
             ) : recentPosts.length === 0 ? (
-              <div className="empty">표시할 중고거래가 없습니다.</div>
+              <EmptyState message="표시할 중고거래가 없습니다." />
             ) : (
               <div className="grid-3">
                 {recentPosts.slice(0, 3).map((post) => (
@@ -126,16 +125,16 @@ export default function MainPage() {
                 ))}
               </div>
             )}
-          </div>
-          <div className="card">
+          </Card>
+          <Card>
             <h2 style={{ marginTop: 0 }}>진행 중 경매</h2>
             {isLoading ? (
               <>
-                <div className="skeleton" style={{ width: "60%" }} />
-                <div className="skeleton" style={{ width: "80%", marginTop: 12 }} />
+                <SkeletonLine width="60%" />
+                <SkeletonLine width="80%" style={{ marginTop: 12 }} />
               </>
             ) : openAuctions.length === 0 ? (
-              <div className="empty">진행 중 경매가 없습니다.</div>
+              <EmptyState message="진행 중 경매가 없습니다." />
             ) : (
               <div className="grid-3">
                 {openAuctions.slice(0, 3).map((auction) => (
@@ -144,7 +143,9 @@ export default function MainPage() {
                     className="panel"
                     href={`/auctions/${auction.auctionId}`}
                   >
-                    <div className="tag">{auction.status}</div>
+                    <div className="tag">
+                      {getAuctionStatusLabel(auction.status)}
+                    </div>
                     <h4 style={{ margin: "12px 0 6px" }}>{auction.name}</h4>
                     <div className="muted">
                       현재 최고가 {formatNumber(auction.currentHighestBid)}원
@@ -153,12 +154,10 @@ export default function MainPage() {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         </div>
         {errorMessage ? (
-          <div className="error" style={{ marginTop: 12 }}>
-            {errorMessage}
-          </div>
+          <ErrorMessage message={errorMessage} style={{ marginTop: 12 }} />
         ) : null}
       </section>
     </div>

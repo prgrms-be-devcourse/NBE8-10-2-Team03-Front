@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { buildApiUrl, parseRsData } from "@/lib/api";
+import { apiRequest, buildApiUrl } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -25,17 +27,16 @@ export default function SignupPage() {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(buildApiUrl("/api/v1/members"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: trimmedUsername,
-          password,
-          nickname: trimmedNickname,
-        }),
-      });
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<unknown>(response);
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<unknown>("/api/v1/members", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: trimmedUsername,
+            password,
+            nickname: trimmedNickname,
+          }),
+        });
       if (!response.ok || apiError || !rsData) {
         setErrorMessage(apiError || "회원가입에 실패했습니다.");
         return;
@@ -56,7 +57,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="card" style={{ maxWidth: 460, margin: "40px auto 0" }}>
+    <Card style={{ maxWidth: 460, margin: "40px auto 0" }}>
       <h1 style={{ marginTop: 0 }}>회원가입</h1>
       <p className="muted">새 계정을 만들어 서비스를 시작하세요.</p>
       <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
@@ -101,9 +102,7 @@ export default function SignupPage() {
           />
         </div>
         {errorMessage ? (
-          <div className="error" style={{ marginTop: 12 }}>
-            {errorMessage}
-          </div>
+          <ErrorMessage message={errorMessage} style={{ marginTop: 12 }} />
         ) : null}
         <button
           className="btn btn-primary"
@@ -126,6 +125,6 @@ export default function SignupPage() {
       <div className="muted" style={{ marginTop: 16 }}>
         이미 계정이 있나요? <Link href="/login">로그인</Link>
       </div>
-    </div>
+    </Card>
   );
 }

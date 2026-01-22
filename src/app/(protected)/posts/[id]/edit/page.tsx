@@ -2,7 +2,11 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { buildApiUrl, parseFieldErrors, parseRsData } from "@/lib/api";
+import { apiRequest, buildApiUrl, parseFieldErrors } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
 
 type PostDetail = {
   id: number;
@@ -63,11 +67,8 @@ export default function PostEditPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch(buildApiUrl(`/api/v1/posts/${postId}`), {
-          credentials: "include",
-        });
-        const { rsData, errorMessage: apiError } =
-          await parseRsData<PostDetail>(response);
+        const { rsData, errorMessage: apiError, response } =
+          await apiRequest<PostDetail>(`/api/v1/posts/${postId}`);
         if (!isMounted) return;
         if (!response.ok || apiError || !rsData) {
           setErrorMessage(apiError || "상세 정보를 불러오지 못했습니다.");
@@ -139,13 +140,11 @@ export default function PostEditPage() {
     form.images.forEach((file) => body.append("images", file));
 
     try {
-      const response = await fetch(buildApiUrl(`/api/v1/posts/${postId}`), {
-        method: "PATCH",
-        credentials: "include",
-        body,
-      });
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<{ id: number }>(response);
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<{ id: number }>(`/api/v1/posts/${postId}`, {
+          method: "PATCH",
+          body,
+        });
       if (!response.ok || !rsData || apiError) {
         if (rsData?.resultCode === "400-1" && rsData.msg) {
           setFieldErrors(parseFieldErrors(rsData.msg));
@@ -170,29 +169,29 @@ export default function PostEditPage() {
 
   if (isLoading) {
     return (
-      <div className="card">
-        <div className="skeleton" style={{ width: "60%" }} />
-        <div className="skeleton" style={{ width: "90%", marginTop: 12 }} />
-      </div>
+      <Card>
+        <SkeletonLine width="60%" />
+        <SkeletonLine width="90%" style={{ marginTop: 12 }} />
+      </Card>
     );
   }
 
   if (errorMessage) {
     return (
-      <div className="card">
-        <div className="error">{errorMessage}</div>
+      <Card>
+        <ErrorMessage message={errorMessage} />
         <div className="actions" style={{ marginTop: 16 }}>
           <button className="btn btn-ghost" onClick={() => router.back()}>
             뒤로가기
           </button>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
     <div className="page">
-      <div className="card">
+      <Card>
         <h1 style={{ marginTop: 0 }}>중고거래 수정</h1>
         <form onSubmit={handleSubmit} style={{ marginTop: 16 }}>
           <div className="field-row">
@@ -261,7 +260,7 @@ export default function PostEditPage() {
           <div className="field" style={{ marginTop: 16 }}>
             <label className="label">기존 이미지</label>
             {existingImageUrls.length === 0 ? (
-              <div className="empty">등록된 이미지가 없습니다.</div>
+              <EmptyState message="등록된 이미지가 없습니다." />
             ) : (
               <div className="grid-2">
                 {existingImageUrls.map((url) => {
@@ -303,9 +302,7 @@ export default function PostEditPage() {
             />
           </div>
           {errorMessage ? (
-            <div className="error" style={{ marginTop: 12 }}>
-              {errorMessage}
-            </div>
+            <ErrorMessage message={errorMessage} style={{ marginTop: 12 }} />
           ) : null}
           <div className="actions" style={{ marginTop: 20 }}>
             <button
@@ -324,7 +321,7 @@ export default function PostEditPage() {
             </button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

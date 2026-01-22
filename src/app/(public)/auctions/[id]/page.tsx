@@ -4,12 +4,18 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  apiRequest,
   buildApiUrl,
   isSuccessResultCode,
-  parseRsData,
   safeJson,
 } from "@/lib/api";
 import { useAuth } from "@/components/auth/AuthContext";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { Panel } from "@/components/ui/Panel";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { getAuctionStatusLabel } from "@/lib/status";
 
 type AuctionDetail = {
   auctionId: number;
@@ -111,9 +117,8 @@ export default function AuctionDetailPage() {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(buildApiUrl(`/api/auctions/${auctionId}`));
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<AuctionDetail>(response);
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<AuctionDetail>(`/api/auctions/${auctionId}`);
       if (!response.ok || apiError || !rsData) {
         setAuction(null);
         if (response.status === 404) {
@@ -146,11 +151,10 @@ export default function AuctionDetailPage() {
       const params = new URLSearchParams();
       params.set("page", String(bidPage));
       params.set("size", String(bidPageSize));
-      const response = await fetch(
-        buildApiUrl(`/api/auctions/${auctionId}/bids?${params.toString()}`)
-      );
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<BidPageData>(response);
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<BidPageData>(
+          `/api/auctions/${auctionId}/bids?${params.toString()}`
+        );
       if (!response.ok || apiError || !rsData) {
         setBids([]);
         setBidsPageData(null);
@@ -201,19 +205,14 @@ export default function AuctionDetailPage() {
     setBidError(null);
     setBidSuccess(null);
     try {
-      const response = await fetch(
-        buildApiUrl(`/api/auctions/${auctionId}/bids`),
-        {
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<{ bidId: number }>(`/api/auctions/${auctionId}/bids`, {
           method: "POST",
-          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ price }),
-        }
-      );
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<{ bidId: number }>(response);
+        });
       if (!response.ok || apiError || !rsData) {
         setBidError(apiError || "입찰에 실패했습니다.");
         return;
@@ -235,15 +234,10 @@ export default function AuctionDetailPage() {
     setReportError(null);
     setReportSuccess(null);
     try {
-      const response = await fetch(
-        buildApiUrl(`/api/v1/members/${auction.seller.id}/credit`),
-        {
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<null>(`/api/v1/members/${auction.seller.id}/credit`, {
           method: "PATCH",
-          credentials: "include",
-        }
-      );
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<null>(response);
+        });
       if (!response.ok || apiError || !rsData) {
         setReportError(apiError || "신고에 실패했습니다.");
         return;
@@ -263,15 +257,10 @@ export default function AuctionDetailPage() {
     setCancelError(null);
     setCancelSuccess(null);
     try {
-      const response = await fetch(
-        buildApiUrl(`/api/auctions/${auctionId}/cancel`),
-        {
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<null>(`/api/auctions/${auctionId}/cancel`, {
           method: "POST",
-          credentials: "include",
-        }
-      );
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<null>(response);
+        });
       if (!response.ok || apiError || !rsData) {
       setCancelError(apiError || "취소에 실패했습니다.");
       return;
@@ -369,28 +358,28 @@ export default function AuctionDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="card">
-        <div className="skeleton" style={{ width: "60%" }} />
-        <div className="skeleton" style={{ width: "90%", marginTop: 12 }} />
-      </div>
+      <Card>
+        <SkeletonLine width="60%" />
+        <SkeletonLine width="90%" style={{ marginTop: 12 }} />
+      </Card>
     );
   }
 
   if (errorMessage) {
     return (
-      <div className="card">
-        <div className="error">{errorMessage}</div>
+      <Card>
+        <ErrorMessage message={errorMessage} />
         <div className="actions" style={{ marginTop: 16 }}>
           <Link className="btn btn-ghost" href="/auctions">
             목록으로 이동
           </Link>
         </div>
-      </div>
+      </Card>
     );
   }
 
   if (!auction) {
-    return <div className="empty">경매 정보를 찾을 수 없습니다.</div>;
+    return <EmptyState message="경매 정보를 찾을 수 없습니다." />;
   }
 
   const isSeller = auth?.me?.id === auction.seller.id;
@@ -421,29 +410,29 @@ export default function AuctionDetailPage() {
   return (
     <div className="page">
       <section className="grid-2">
-        <div className="card">
+        <Card>
           <h2 style={{ marginTop: 0 }}>이미지</h2>
           {auction.imageUrls?.length ? (
             <div className="grid-2">
               {auction.imageUrls.map((url, index) => {
                 const resolvedUrl = resolveImageUrl(url);
                 return (
-                  <div key={`${url}-${index}`} className="panel">
+                  <Panel key={`${url}-${index}`}>
                     <img
                       alt={`경매 이미지 ${index + 1}`}
                       src={resolvedUrl}
                       style={{ width: "100%", borderRadius: 12 }}
                     />
-                  </div>
+                  </Panel>
                 );
               })}
             </div>
           ) : (
-            <div className="empty">등록된 이미지가 없습니다.</div>
+            <EmptyState message="등록된 이미지가 없습니다." />
           )}
-        </div>
-        <div className="card">
-          <div className="tag">{auction.status}</div>
+        </Card>
+        <Card>
+          <div className="tag">{getAuctionStatusLabel(auction.status)}</div>
           <h1 style={{ marginTop: 8 }}>{auction.name}</h1>
           <p>{auction.description}</p>
           <div className="muted">
@@ -458,7 +447,7 @@ export default function AuctionDetailPage() {
             {auction.endAt}
           </div>
           {auction.status === "COMPLETED" ? (
-            <div className="panel" style={{ marginTop: 16 }}>
+            <Panel style={{ marginTop: 16 }}>
               <h3 style={{ marginTop: 0 }}>낙찰 정보</h3>
               <div className="muted">낙찰자 {winnerNickname}</div>
               <div>낙찰가 {formatNumber(winningPrice)}원</div>
@@ -476,14 +465,12 @@ export default function AuctionDetailPage() {
                 </div>
               ) : null}
               {chatError ? (
-                <div className="error" style={{ marginTop: 8 }}>
-                  {chatError}
-                </div>
+                <ErrorMessage message={chatError} style={{ marginTop: 8 }} />
               ) : null}
-            </div>
+            </Panel>
           ) : null}
           {auction.status === "CANCELLED" ? (
-            <div className="panel" style={{ marginTop: 16 }}>
+            <Panel style={{ marginTop: 16 }}>
               <h3 style={{ marginTop: 0 }}>취소 정보</h3>
               <div className="muted">
                 취소자{" "}
@@ -492,10 +479,10 @@ export default function AuctionDetailPage() {
                   "-"}
               </div>
               <div className="muted">취소 시간 {auction.closedAt || "-"}</div>
-            </div>
+            </Panel>
           ) : null}
           {!isSeller ? (
-            <div className="panel" style={{ marginTop: 16 }}>
+            <Panel style={{ marginTop: 16 }}>
               <div className="field">
                 <label className="label" htmlFor="bidAmount">
                   입찰가
@@ -511,9 +498,7 @@ export default function AuctionDetailPage() {
                 />
               </div>
               {bidError ? (
-                <div className="error" style={{ marginTop: 8 }}>
-                  {bidError}
-                </div>
+                <ErrorMessage message={bidError} style={{ marginTop: 8 }} />
               ) : null}
               {bidSuccess ? (
                 <div className="tag" style={{ marginTop: 8 }}>
@@ -535,10 +520,10 @@ export default function AuctionDetailPage() {
                   종료된 경매에는 입찰할 수 없습니다.
                 </div>
               ) : null}
-            </div>
+            </Panel>
           ) : null}
           {isSeller ? (
-            <div className="panel" style={{ marginTop: 16 }}>
+            <Panel style={{ marginTop: 16 }}>
               <div className="actions">
                 <button
                   className="btn btn-ghost"
@@ -560,9 +545,7 @@ export default function AuctionDetailPage() {
                 ) : null}
               </div>
               {cancelError ? (
-                <div className="error" style={{ marginTop: 8 }}>
-                  {cancelError}
-                </div>
+                <ErrorMessage message={cancelError} style={{ marginTop: 8 }} />
               ) : null}
               {!canDelete && isAuctionOpen ? (
                 <div className="muted" style={{ marginTop: 8 }}>
@@ -574,10 +557,10 @@ export default function AuctionDetailPage() {
                   입찰이 없을 때만 수정할 수 있습니다.
                 </div>
               ) : null}
-            </div>
+            </Panel>
           ) : null}
           {shouldShowCancelTrade ? (
-            <div className="panel" style={{ marginTop: 16 }}>
+            <Panel style={{ marginTop: 16 }}>
               <div className="actions">
                 <button
                   className="btn btn-danger"
@@ -589,9 +572,7 @@ export default function AuctionDetailPage() {
                 </button>
               </div>
               {cancelError ? (
-                <div className="error" style={{ marginTop: 8 }}>
-                  {cancelError}
-                </div>
+                <ErrorMessage message={cancelError} style={{ marginTop: 8 }} />
               ) : null}
               {cancelSuccess ? (
                 <div className="success" style={{ marginTop: 8 }}>
@@ -603,19 +584,19 @@ export default function AuctionDetailPage() {
                   거래 취소 권한이 없습니다.
                 </div>
               ) : null}
-            </div>
+            </Panel>
           ) : null}
-          <div className="panel" style={{ marginTop: 16 }}>
+          <Panel style={{ marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>입찰 내역</h3>
             {isBidsLoading ? (
               <>
-                <div className="skeleton" style={{ width: "60%" }} />
-                <div className="skeleton" style={{ width: "80%", marginTop: 8 }} />
+                <SkeletonLine width="60%" />
+                <SkeletonLine width="80%" style={{ marginTop: 8 }} />
               </>
             ) : bidsError ? (
-              <div className="error">{bidsError}</div>
+              <ErrorMessage message={bidsError} />
             ) : bids.length === 0 ? (
-              <div className="empty">입찰 내역이 없습니다.</div>
+              <EmptyState message="입찰 내역이 없습니다." />
             ) : (
               <div style={{ display: "grid", gap: 10 }}>
                 {bids.map((bid) => (
@@ -659,7 +640,7 @@ export default function AuctionDetailPage() {
                 </button>
               </div>
             ) : null}
-          </div>
+          </Panel>
           {auction.categoryName ? (
             <div className="tag" style={{ marginTop: 8 }}>
               {auction.categoryName}
@@ -670,7 +651,7 @@ export default function AuctionDetailPage() {
             {auction.seller.reputationScore})
           </div>
           {!isSeller ? (
-            <div className="panel" style={{ marginTop: 16 }}>
+            <Panel style={{ marginTop: 16 }}>
               <div className="actions">
                 <button
                   className="btn btn-danger"
@@ -682,18 +663,16 @@ export default function AuctionDetailPage() {
                 </button>
               </div>
               {reportError ? (
-                <div className="error" style={{ marginTop: 8 }}>
-                  {reportError}
-                </div>
+                <ErrorMessage message={reportError} style={{ marginTop: 8 }} />
               ) : null}
               {reportSuccess ? (
                 <div className="success" style={{ marginTop: 8 }}>
                   {reportSuccess}
                 </div>
               ) : null}
-            </div>
+            </Panel>
           ) : null}
-          <div className="panel" style={{ marginTop: 16 }}>
+          <Panel style={{ marginTop: 16 }}>
             {auction.status === "OPEN"
               ? "진행 중인 경매입니다. 새로고침으로 최신 상태를 확인하세요."
               : auction.status === "CLOSED"
@@ -701,8 +680,8 @@ export default function AuctionDetailPage() {
                 : auction.status === "COMPLETED"
                   ? "낙찰이 완료된 경매입니다."
                   : "취소된 경매입니다."}
-          </div>
-        </div>
+          </Panel>
+        </Card>
       </section>
     </div>
   );

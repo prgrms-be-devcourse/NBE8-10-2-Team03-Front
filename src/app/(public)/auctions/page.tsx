@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { buildApiUrl, parseRsData } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { getAuctionStatusLabel } from "@/lib/status";
 
 type AuctionItem = {
   auctionId: number;
@@ -66,9 +71,8 @@ export default function AuctionsPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch(buildApiUrl(`/api/auctions?${buildQuery()}`));
-        const { rsData, errorMessage: apiError } =
-          await parseRsData<AuctionPageData>(response);
+        const { rsData, errorMessage: apiError, response } =
+          await apiRequest<AuctionPageData>(`/api/auctions?${buildQuery()}`);
         if (!isMounted) return;
         if (!response.ok || apiError || !rsData) {
           setAuctions([]);
@@ -124,10 +128,10 @@ export default function AuctionsPage() {
               value={status}
               onChange={(event) => setStatus(event.target.value)}
             >
-              <option value="OPEN">OPEN</option>
-              <option value="CLOSED">CLOSED</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="CANCELLED">CANCELLED</option>
+              <option value="OPEN">진행 중</option>
+              <option value="CLOSED">입찰 없음</option>
+              <option value="COMPLETED">낙찰 완료</option>
+              <option value="CANCELLED">취소됨</option>
             </select>
           </div>
           <div className="field">
@@ -180,14 +184,14 @@ export default function AuctionsPage() {
 
       <section style={{ marginTop: 24 }}>
         {isLoading ? (
-          <div className="card">
-            <div className="skeleton" style={{ width: "70%" }} />
-            <div className="skeleton" style={{ width: "90%", marginTop: 12 }} />
-          </div>
+          <Card>
+            <SkeletonLine width="70%" />
+            <SkeletonLine width="90%" style={{ marginTop: 12 }} />
+          </Card>
         ) : errorMessage ? (
-          <div className="error">{errorMessage}</div>
+          <ErrorMessage message={errorMessage} />
         ) : auctions.length === 0 ? (
-          <div className="empty">표시할 경매가 없습니다.</div>
+          <EmptyState message="표시할 경매가 없습니다." />
         ) : (
           <div className="grid-3">
             {auctions.map((auction) => (
@@ -196,7 +200,9 @@ export default function AuctionsPage() {
                 className="card"
                 href={`/auctions/${auction.auctionId}`}
               >
-                <div className="tag">{auction.status}</div>
+                <div className="tag">
+                  {getAuctionStatusLabel(auction.status)}
+                </div>
                 <h3 style={{ margin: "12px 0 6px" }}>{auction.name}</h3>
                 <div className="muted">
                   현재가 {formatNumber(auction.currentHighestBid)}원

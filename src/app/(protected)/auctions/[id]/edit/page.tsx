@@ -3,7 +3,11 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { buildApiUrl, parseFieldErrors, parseRsData } from "@/lib/api";
+import { apiRequest, buildApiUrl, parseFieldErrors } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
 
 type AuctionDetail = {
   auctionId: number;
@@ -85,11 +89,8 @@ export default function AuctionEditPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch(buildApiUrl(`/api/auctions/${auctionId}`), {
-          credentials: "include",
-        });
-        const { rsData, errorMessage: apiError } =
-          await parseRsData<AuctionDetail>(response);
+        const { rsData, errorMessage: apiError, response } =
+          await apiRequest<AuctionDetail>(`/api/auctions/${auctionId}`);
         if (!isMounted) return;
         if (!response.ok || apiError || !rsData) {
           setErrorMessage(apiError || "상세 정보를 불러오지 못했습니다.");
@@ -182,13 +183,11 @@ export default function AuctionEditPage() {
     form.images.forEach((file) => body.append("images", file));
 
     try {
-      const response = await fetch(buildApiUrl(`/api/auctions/${auctionId}`), {
-        method: "PATCH",
-        credentials: "include",
-        body,
-      });
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<{ auctionId: number }>(response);
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<{ auctionId: number }>(`/api/auctions/${auctionId}`, {
+          method: "PATCH",
+          body,
+        });
       if (!response.ok || !rsData || apiError) {
         if (rsData?.resultCode === "400-1" && rsData.msg) {
           setFieldErrors(parseFieldErrors(rsData.msg));
@@ -213,29 +212,29 @@ export default function AuctionEditPage() {
 
   if (isLoading) {
     return (
-      <div className="card">
-        <div className="skeleton" style={{ width: "60%" }} />
-        <div className="skeleton" style={{ width: "90%", marginTop: 12 }} />
-      </div>
+      <Card>
+        <SkeletonLine width="60%" />
+        <SkeletonLine width="90%" style={{ marginTop: 12 }} />
+      </Card>
     );
   }
 
   if (errorMessage) {
     return (
-      <div className="card">
-        <div className="error">{errorMessage}</div>
+      <Card>
+        <ErrorMessage message={errorMessage} />
         <div className="actions" style={{ marginTop: 16 }}>
           <button className="btn btn-ghost" onClick={() => router.back()}>
             뒤로가기
           </button>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
     <div className="page">
-      <div className="card">
+      <Card>
         <h1 style={{ marginTop: 0 }}>경매 수정</h1>
         <form onSubmit={handleSubmit} style={{ marginTop: 16 }}>
           <div className="field">
@@ -321,7 +320,7 @@ export default function AuctionEditPage() {
           <div className="field" style={{ marginTop: 16 }}>
             <label className="label">기존 이미지</label>
             {existingImageUrls.length === 0 ? (
-              <div className="empty">등록된 이미지가 없습니다.</div>
+              <EmptyState message="등록된 이미지가 없습니다." />
             ) : (
               <div className="grid-2">
                 {existingImageUrls.map((url) => {
@@ -363,9 +362,7 @@ export default function AuctionEditPage() {
             />
           </div>
           {errorMessage ? (
-            <div className="error" style={{ marginTop: 12 }}>
-              {errorMessage}
-            </div>
+            <ErrorMessage message={errorMessage} style={{ marginTop: 12 }} />
           ) : null}
           <div className="actions" style={{ marginTop: 20 }}>
             <button
@@ -384,7 +381,7 @@ export default function AuctionEditPage() {
             </button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

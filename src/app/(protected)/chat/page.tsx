@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
-import { buildApiUrl, parseRsData, safeJson } from "@/lib/api";
+import { apiRequest, buildApiUrl } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
 
 type ChatDto = {
   id?: number;
@@ -62,14 +66,12 @@ export default function ChatPage() {
       setIsRoomsLoading(true);
       setRoomsError(null);
       try {
-        const response = await fetch(buildApiUrl("/api/chat/list"), {
-          credentials: "include",
-        });
+        const { rsData, errorMessage, response } =
+          await apiRequest<ChatDto[]>("/api/chat/list");
         if (!response.ok) {
           setRoomsError("채팅 목록을 불러오지 못했습니다.");
           return;
         }
-        const { rsData, errorMessage } = await parseRsData<ChatDto[]>(response);
         if (!rsData) {
           setRoomsError(errorMessage || "응답 파싱에 실패했습니다.");
           return;
@@ -148,17 +150,12 @@ export default function ChatPage() {
       setIsMessagesLoading(true);
       setMessagesError(null);
       try {
-        const response = await fetch(
-          buildApiUrl(`/api/chat/room/${selectedRoomId}`),
-          {
-          credentials: "include",
-          }
-        );
+        const { rsData, errorMessage, response } =
+          await apiRequest<ChatDto[]>(`/api/chat/room/${selectedRoomId}`);
         if (!response.ok) {
           setMessagesError("메시지를 불러오지 못했습니다.");
           return;
         }
-        const { rsData, errorMessage } = await parseRsData<ChatDto[]>(response);
         if (!rsData) {
           setMessagesError(errorMessage || "응답 파싱에 실패했습니다.");
           return;
@@ -221,13 +218,9 @@ export default function ChatPage() {
         return;
       }
       setMessageText("");
-      const refreshed = await fetch(
-        buildApiUrl(`/api/chat/room/${selectedRoomId}`),
-        {
-        credentials: "include",
-        }
+      const { rsData } = await apiRequest<ChatDto[]>(
+        `/api/chat/room/${selectedRoomId}`
       );
-      const { rsData } = await parseRsData<ChatDto[]>(refreshed);
       if (rsData) {
         setMessages(rsData.data || []);
       }
@@ -241,17 +234,17 @@ export default function ChatPage() {
   return (
     <div className="page">
       <div className="split">
-        <div className="card">
+        <Card>
           <h2 style={{ marginTop: 0 }}>채팅 목록</h2>
           {isRoomsLoading ? (
             <>
-              <div className="skeleton" style={{ width: "70%" }} />
-              <div className="skeleton" style={{ width: "90%", marginTop: 12 }} />
+              <SkeletonLine width="70%" />
+              <SkeletonLine width="90%" style={{ marginTop: 12 }} />
             </>
           ) : roomsError ? (
-            <div className="error">{roomsError}</div>
+            <ErrorMessage message={roomsError} />
           ) : rooms.length === 0 ? (
-            <div className="empty">채팅방이 없습니다.</div>
+            <EmptyState message="채팅방이 없습니다." />
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
               {rooms.map((room) => (
@@ -281,21 +274,21 @@ export default function ChatPage() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
 
-        <div className="card">
+        <Card>
           <h2 style={{ marginTop: 0 }}>메시지</h2>
           {!selectedRoomId ? (
-            <div className="empty">채팅방을 선택하세요.</div>
+            <EmptyState message="채팅방을 선택하세요." />
           ) : isMessagesLoading ? (
             <>
-              <div className="skeleton" style={{ width: "70%" }} />
-              <div className="skeleton" style={{ width: "90%", marginTop: 12 }} />
+              <SkeletonLine width="70%" />
+              <SkeletonLine width="90%" style={{ marginTop: 12 }} />
             </>
           ) : messagesError ? (
-            <div className="error">{messagesError}</div>
+            <ErrorMessage message={messagesError} />
           ) : messages.length === 0 ? (
-            <div className="empty">메시지가 없습니다.</div>
+            <EmptyState message="메시지가 없습니다." />
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
               {messages.map((message, index) => (
@@ -324,9 +317,7 @@ export default function ChatPage() {
                 />
               </div>
               {sendError ? (
-                <div className="error" style={{ marginTop: 8 }}>
-                  {sendError}
-                </div>
+                <ErrorMessage message={sendError} style={{ marginTop: 8 }} />
               ) : null}
               <div className="actions" style={{ marginTop: 12 }}>
                 <button
@@ -345,7 +336,7 @@ export default function ChatPage() {
               </div>
             </div>
           ) : null}
-        </div>
+        </Card>
       </div>
     </div>
   );

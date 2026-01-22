@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { buildApiUrl, parseRsData, safeJson } from "@/lib/api";
+import { apiRequest, buildApiUrl, safeJson } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
 
 type MemberMe = {
   id: number;
@@ -82,14 +86,12 @@ export default function MyPage() {
     setNicknameError(null);
     setNicknameSuccess(null);
     try {
-      const response = await fetch(buildApiUrl("/api/v1/members/me/nickname"), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ nickname: trimmedNickname }),
-      });
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<unknown>(response);
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<unknown>("/api/v1/members/me/nickname", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nickname: trimmedNickname }),
+        });
       if (!response.ok || apiError || !rsData) {
         setNicknameError(apiError || "닉네임 수정에 실패했습니다.");
         return;
@@ -129,18 +131,16 @@ export default function MyPage() {
     setPasswordError(null);
     setPasswordSuccess(null);
     try {
-      const response = await fetch(buildApiUrl("/api/v1/members/me/password"), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          password: currentPassword,
-          newPassword,
-          checkPassword: confirmPassword,
-        }),
-      });
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<unknown>(response);
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<unknown>("/api/v1/members/me/password", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            password: currentPassword,
+            newPassword,
+            checkPassword: confirmPassword,
+          }),
+        });
       if (!response.ok || apiError || !rsData) {
         setPasswordError(apiError || "비밀번호 수정에 실패했습니다.");
         setPasswordSuccess(null);
@@ -159,25 +159,25 @@ export default function MyPage() {
 
   if (isLoading) {
     return (
-      <div className="card">
-        <div className="skeleton" style={{ width: "60%" }} />
-        <div className="skeleton" style={{ width: "90%", marginTop: 12 }} />
-      </div>
+      <Card>
+        <SkeletonLine width="60%" />
+        <SkeletonLine width="90%" style={{ marginTop: 12 }} />
+      </Card>
     );
   }
 
   if (errorMessage) {
-    return <div className="error">{errorMessage}</div>;
+    return <ErrorMessage message={errorMessage} />;
   }
 
   if (!me) {
-    return <div className="empty">사용자 정보를 찾을 수 없습니다.</div>;
+    return <EmptyState message="사용자 정보를 찾을 수 없습니다." />;
   }
 
   return (
     <div className="page">
       <div className="grid-2">
-        <div className="card">
+        <Card>
           <h2 style={{ marginTop: 0 }}>프로필</h2>
           <div>
             <strong>{me.name}</strong> ({me.username})
@@ -185,14 +185,14 @@ export default function MyPage() {
           <div className="muted" style={{ marginTop: 8 }}>
             가입일: {me.createDate}
           </div>
-        </div>
-        <div className="card">
+        </Card>
+        <Card>
           <h2 style={{ marginTop: 0 }}>점수</h2>
           <div style={{ fontSize: 32, fontWeight: 700 }}>
             {me.score === null ? "-" : me.score}
           </div>
-        </div>
-        <div className="card">
+        </Card>
+        <Card>
           <h2 style={{ marginTop: 0 }}>닉네임 수정</h2>
           <form onSubmit={handleNicknameSubmit}>
             <div className="field">
@@ -213,9 +213,7 @@ export default function MyPage() {
               />
             </div>
             {nicknameError ? (
-              <div className="error" style={{ marginTop: 12 }}>
-                {nicknameError}
-              </div>
+              <ErrorMessage message={nicknameError} style={{ marginTop: 12 }} />
             ) : null}
             {nicknameSuccess ? (
               <div className="success" style={{ marginTop: 12 }}>
@@ -231,8 +229,8 @@ export default function MyPage() {
               {isNicknameLoading ? "수정 중..." : "닉네임 변경"}
             </button>
           </form>
-        </div>
-        <div className="card">
+        </Card>
+        <Card>
           <h2 style={{ marginTop: 0 }}>비밀번호 수정</h2>
           <form onSubmit={handlePasswordSubmit}>
             <div className="field">
@@ -293,9 +291,7 @@ export default function MyPage() {
               />
             </div>
             {passwordError ? (
-              <div className="error" style={{ marginTop: 12 }}>
-                {passwordError}
-              </div>
+              <ErrorMessage message={passwordError} style={{ marginTop: 12 }} />
             ) : null}
             {passwordSuccess ? (
               <div className="success" style={{ marginTop: 12 }}>
@@ -311,7 +307,7 @@ export default function MyPage() {
               {isPasswordLoading ? "수정 중..." : "비밀번호 변경"}
             </button>
           </form>
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthProvider, type MemberMe } from "@/components/auth/AuthContext";
-import { buildApiUrl, parseRsData } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { Panel } from "@/components/ui/Panel";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { fetchMe } from "@/lib/auth";
 
 type AuthStatus = "checking" | "authed" | "guest";
@@ -52,11 +55,8 @@ export default function ProtectedLayout({
     setIsLoggingOut(true);
     setGlobalErrorMessage(null);
     try {
-      const response = await fetch(buildApiUrl("/api/v1/members/logout"), {
-        method: "DELETE",
-        credentials: "include",
-      });
-      const { rsData, errorMessage } = await parseRsData<null>(response);
+      const { rsData, errorMessage, response } =
+        await apiRequest<null>("/api/v1/members/logout", { method: "DELETE" });
       if (!response.ok || errorMessage || !rsData) {
         setGlobalErrorMessage(errorMessage || "로그아웃에 실패했습니다.");
         return;
@@ -82,7 +82,7 @@ export default function ProtectedLayout({
             </Link>
             <div className="actions">
               {authStatus === "checking" ? (
-                <div className="skeleton" style={{ width: 140 }} />
+                <SkeletonLine width={140} />
               ) : (
                 <span className="tag">
                   {me?.name || me?.username || "사용자"}
@@ -99,17 +99,17 @@ export default function ProtectedLayout({
           </div>
           {globalErrorMessage ? (
             <div className="container">
-              <div className="error">{globalErrorMessage}</div>
+              <ErrorMessage message={globalErrorMessage} />
             </div>
           ) : null}
         </header>
         {authStatus === "checking" ? (
           <main className="container">
-            <div className="panel">
-              <div className="skeleton" style={{ width: "40%" }} />
-              <div className="skeleton" style={{ width: "70%", marginTop: 12 }} />
-              <div className="skeleton" style={{ width: "60%", marginTop: 12 }} />
-            </div>
+            <Panel>
+              <SkeletonLine width="40%" />
+              <SkeletonLine width="70%" style={{ marginTop: 12 }} />
+              <SkeletonLine width="60%" style={{ marginTop: 12 }} />
+            </Panel>
           </main>
         ) : authStatus === "authed" ? (
           <main className="container fade-in">{children}</main>

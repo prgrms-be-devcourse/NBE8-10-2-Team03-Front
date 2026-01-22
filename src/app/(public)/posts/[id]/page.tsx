@@ -5,11 +5,17 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import {
+  apiRequest,
   buildApiUrl,
   isSuccessResultCode,
-  parseRsData,
   safeJson,
 } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { Panel } from "@/components/ui/Panel";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { getPostStatusLabel } from "@/lib/status";
 
 type PostDetail = {
   id: number;
@@ -71,11 +77,8 @@ export default function PostDetailPage() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const response = await fetch(buildApiUrl(`/api/v1/posts/${postId}`), {
-          credentials: "include",
-        });
-        const { rsData, errorMessage: apiError } =
-          await parseRsData<PostDetail>(response);
+        const { rsData, errorMessage: apiError, response } =
+          await apiRequest<PostDetail>(`/api/v1/posts/${postId}`);
         if (!isMounted) return;
         if (!response.ok || apiError || !rsData) {
           setPost(null);
@@ -106,12 +109,10 @@ export default function PostDetailPage() {
     setIsDeleting(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(buildApiUrl(`/api/v1/posts/${postId}`), {
-        method: "DELETE",
-        credentials: "include",
-      });
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<{ id: number }>(response);
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<{ id: number }>(`/api/v1/posts/${postId}`, {
+          method: "DELETE",
+        });
       if (!response.ok || apiError || !rsData) {
         setErrorMessage(apiError || "삭제에 실패했습니다.");
         return;
@@ -202,17 +203,12 @@ export default function PostDetailPage() {
     setStatusError(null);
     setStatusSuccess(null);
     try {
-      const response = await fetch(
-        buildApiUrl(`/api/v1/posts/${postId}/status`),
-        {
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<{ id: number }>(`/api/v1/posts/${postId}/status`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify({ status: statusValue }),
-        }
-      );
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<{ id: number }>(response);
+        });
       if (!response.ok || apiError || !rsData) {
         setStatusError(apiError || "상태 변경에 실패했습니다.");
         return;
@@ -228,61 +224,61 @@ export default function PostDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="card">
-        <div className="skeleton" style={{ width: "60%" }} />
-        <div className="skeleton" style={{ width: "90%", marginTop: 12 }} />
-      </div>
+      <Card>
+        <SkeletonLine width="60%" />
+        <SkeletonLine width="90%" style={{ marginTop: 12 }} />
+      </Card>
     );
   }
 
   if (errorMessage) {
     return (
-      <div className="card">
-        <div className="error">{errorMessage}</div>
+      <Card>
+        <ErrorMessage message={errorMessage} />
         <div className="actions" style={{ marginTop: 16 }}>
           <Link className="btn btn-ghost" href="/posts">
             목록으로 이동
           </Link>
         </div>
-      </div>
+      </Card>
     );
   }
 
   if (!post) {
-    return <div className="empty">존재하지 않는 게시글입니다.</div>;
+    return <EmptyState message="존재하지 않는 게시글입니다." />;
   }
 
   return (
     <div className="page">
       <section className="grid-2">
-        <div className="card">
+        <Card>
           <h2 style={{ marginTop: 0 }}>이미지</h2>
           {post.imageUrls?.length ? (
             <div className="grid-2">
               {post.imageUrls.map((url, index) => {
                 const resolvedUrl = resolveImageUrl(url);
                 return (
-                  <div key={`${url}-${index}`} className="panel">
+                  <Panel key={`${url}-${index}`}>
                     <img
                       alt={`게시글 이미지 ${index + 1}`}
                       src={resolvedUrl}
                       style={{ width: "100%", borderRadius: 12 }}
                     />
-                  </div>
+                  </Panel>
                 );
               })}
             </div>
           ) : (
-            <div className="empty">등록된 이미지가 없습니다.</div>
+            <EmptyState message="등록된 이미지가 없습니다." />
           )}
-        </div>
-        <div className="card">
+        </Card>
+        <Card>
           <h1 style={{ marginTop: 0 }}>{post.title}</h1>
           <div className="tag">{post.categoryName}</div>
           <p style={{ marginTop: 12 }}>{post.content}</p>
           <div className="muted">
-            {post.price.toLocaleString()}원 · {post.status} · {post.createDate} ·
-            조회 {post.viewCount.toLocaleString()}
+            {post.price.toLocaleString()}원 · {getPostStatusLabel(post.status)} ·{" "}
+            {post.createDate} · 조회 {post.viewCount.toLocaleString()}
           </div>
           <div style={{ marginTop: 16 }}>
             판매자: <strong>{post.sellerNickname}</strong>
@@ -298,9 +294,7 @@ export default function PostDetailPage() {
                   {isCreatingChat ? "채팅방 생성 중..." : "채팅 시작"}
                 </button>
                 {chatError ? (
-                  <div className="error" style={{ marginTop: 8 }}>
-                    {chatError}
-                  </div>
+                  <ErrorMessage message={chatError} style={{ marginTop: 8 }} />
                 ) : null}
               </div>
             ) : null}
@@ -323,7 +317,7 @@ export default function PostDetailPage() {
             ) : null}
           </div>
           {isSeller ? (
-            <div className="panel" style={{ marginTop: 16 }}>
+            <Panel style={{ marginTop: 16 }}>
               <div className="field">
                 <label className="label" htmlFor="post-status">
                   상태 변경
@@ -341,9 +335,7 @@ export default function PostDetailPage() {
                 </select>
               </div>
               {statusError ? (
-                <div className="error" style={{ marginTop: 8 }}>
-                  {statusError}
-                </div>
+                <ErrorMessage message={statusError} style={{ marginTop: 8 }} />
               ) : null}
               {statusSuccess ? (
                 <div className="success" style={{ marginTop: 8 }}>
@@ -359,9 +351,9 @@ export default function PostDetailPage() {
                   {isStatusUpdating ? "변경 중..." : "상태 변경"}
                 </button>
               </div>
-            </div>
+            </Panel>
           ) : null}
-        </div>
+        </Card>
       </section>
     </div>
   );

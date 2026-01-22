@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { buildApiUrl, parseFieldErrors, parseRsData } from "@/lib/api";
+import { apiRequest, parseFieldErrors } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 
 export default function AuctionWritePage() {
   const router = useRouter();
@@ -84,13 +86,11 @@ export default function AuctionWritePage() {
     form.images.forEach((file) => body.append("images", file));
 
     try {
-      const response = await fetch(buildApiUrl("/api/auctions"), {
-        method: "POST",
-        credentials: "include",
-        body,
-      });
-      const { rsData, errorMessage: apiError } =
-        await parseRsData<{ auctionId: number }>(response);
+      const { rsData, errorMessage: apiError, response } =
+        await apiRequest<{ auctionId: number }>("/api/auctions", {
+          method: "POST",
+          body,
+        });
       if (!response.ok || !rsData || apiError) {
         if (rsData?.resultCode === "400-1" && rsData.msg) {
           setFieldErrors(parseFieldErrors(rsData.msg));
@@ -109,7 +109,7 @@ export default function AuctionWritePage() {
 
   return (
     <div className="page">
-      <div className="card">
+      <Card>
         <h1 style={{ marginTop: 0 }}>경매 등록</h1>
         <form onSubmit={handleSubmit} style={{ marginTop: 16 }}>
           <div className="field">
@@ -234,9 +234,7 @@ export default function AuctionWritePage() {
             />
           </div>
           {errorMessage ? (
-            <div className="error" style={{ marginTop: 12 }}>
-              {errorMessage}
-            </div>
+            <ErrorMessage message={errorMessage} style={{ marginTop: 12 }} />
           ) : null}
           <div className="actions" style={{ marginTop: 20 }}>
             <button
@@ -255,7 +253,7 @@ export default function AuctionWritePage() {
             </button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

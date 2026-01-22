@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import PublicShell from "@/components/layout/PublicShell";
 import { fetchMe } from "@/lib/auth";
+import { Panel } from "@/components/ui/Panel";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
 
 export default function GuestLayout({
   children,
@@ -34,10 +36,10 @@ export default function GuestLayout({
     return (
       <div className="page">
         <main className="container">
-          <div className="panel">
-            <div className="skeleton" style={{ width: "40%" }} />
-            <div className="skeleton" style={{ width: "70%", marginTop: 12 }} />
-          </div>
+          <Panel>
+            <SkeletonLine width="40%" />
+            <SkeletonLine width="70%" style={{ marginTop: 12 }} />
+          </Panel>
         </main>
       </div>
     );

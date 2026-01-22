@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { buildApiUrl, isSuccessResultCode, safeJson } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -71,7 +73,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="card" style={{ maxWidth: 420, margin: "40px auto 0" }}>
+    <Card style={{ maxWidth: 420, margin: "40px auto 0" }}>
       <h1 style={{ marginTop: 0 }}>로그인</h1>
       <p className="muted">아이디와 비밀번호로 로그인하세요.</p>
       <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
@@ -103,9 +105,7 @@ export default function LoginPage() {
           />
         </div>
         {errorMessage ? (
-          <div className="error" style={{ marginTop: 12 }}>
-            {errorMessage}
-          </div>
+          <ErrorMessage message={errorMessage} style={{ marginTop: 12 }} />
         ) : null}
         <button
           className="btn btn-primary"
@@ -128,6 +128,6 @@ export default function LoginPage() {
       <div className="muted" style={{ marginTop: 16 }}>
         계정이 없나요? <Link href="/signup">회원가입</Link>
       </div>
-    </div>
+    </Card>
   );
 }

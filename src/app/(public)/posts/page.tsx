@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
-import { buildApiUrl, parseRsData } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { getPostStatusLabel } from "@/lib/status";
 
 type PostItem = {
   id: number;
@@ -60,12 +65,8 @@ export default function PostsPage() {
         if (sort === "LATEST") {
           params.set("sort", "createDate,desc");
         }
-        const response = await fetch(
-          buildApiUrl(`/api/v1/posts?${params.toString()}`),
-          { credentials: "include" }
-        );
-        const { rsData, errorMessage: apiError } =
-          await parseRsData<PostPageData>(response);
+        const { rsData, errorMessage: apiError, response } =
+          await apiRequest<PostPageData>(`/api/v1/posts?${params.toString()}`);
         if (!isMounted) return;
         if (!response.ok || apiError || !rsData) {
           setPosts([]);
@@ -153,14 +154,14 @@ export default function PostsPage() {
 
       <section style={{ marginTop: 24 }}>
         {isLoading ? (
-          <div className="card">
-            <div className="skeleton" style={{ width: "70%" }} />
-            <div className="skeleton" style={{ width: "90%", marginTop: 12 }} />
-          </div>
+          <Card>
+            <SkeletonLine width="70%" />
+            <SkeletonLine width="90%" style={{ marginTop: 12 }} />
+          </Card>
         ) : errorMessage ? (
-          <div className="error">{errorMessage}</div>
+          <ErrorMessage message={errorMessage} />
         ) : filteredPosts.length === 0 ? (
-          <div className="empty">검색 결과가 없습니다.</div>
+          <EmptyState message="검색 결과가 없습니다." />
         ) : (
           <div className="grid-3">
             {filteredPosts.map((post) => (
@@ -168,7 +169,8 @@ export default function PostsPage() {
                 <div className="tag">{post.categoryName}</div>
                 <h3 style={{ margin: "12px 0 6px" }}>{post.title}</h3>
                 <div className="muted">
-                  {formatNumber(post.price)}원 · {post.createDate} · 조회{" "}
+                  {formatNumber(post.price)}원 ·{" "}
+                  {getPostStatusLabel(post.status)} · {post.createDate} · 조회{" "}
                   {formatNumber(post.viewCount)}
                 </div>
               </Link>
