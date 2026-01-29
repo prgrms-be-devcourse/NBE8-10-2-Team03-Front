@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { formatDateTime } from "@/lib/datetime";
+import { formatScore } from "@/lib/score";
 
 type ReviewDto = {
   id: number;
@@ -111,7 +112,7 @@ export default function MemberReviewsPage() {
           <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
             {reviews.map((review) => (
               <div key={review.id} className="card">
-                <div className="muted">평점 {review.score}</div>
+                <div className="muted">평점 {formatScore(review.score)}</div>
                 <div style={{ marginTop: 6 }}>
                   {review.comment || "코멘트 없음"}
                 </div>

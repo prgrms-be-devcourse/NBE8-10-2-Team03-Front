@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { formatDateTime } from "@/lib/datetime";
+import { formatScore } from "@/lib/score";
 
 type MemberMe = {
   id: number;
@@ -465,9 +466,9 @@ export default function MyPage() {
           </div>
         </Card>
         <Card>
-          <h2 style={{ marginTop: 0 }}>신뢰도</h2>
+          <h2 style={{ marginTop: 0 }}>고구마 온도</h2>
           <div style={{ fontSize: 32, fontWeight: 700 }}>
-            {me.score === null ? "-" : me.score.toFixed(1)}
+            {formatScore(me.score)}
           </div>
         </Card>
         <Card>
@@ -819,7 +820,7 @@ export default function MyPage() {
             >
               {reviews.map((review) => (
                 <div key={review.id} className="card">
-                  <div className="muted">평점 {review.score}</div>
+                  <div className="muted">평점 {formatScore(review.score)}</div>
                   <div style={{ marginTop: 6 }}>
                     {review.comment || "내용 없음"}
                   </div>
