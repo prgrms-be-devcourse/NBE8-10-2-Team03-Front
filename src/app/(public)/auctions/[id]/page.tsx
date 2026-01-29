@@ -20,7 +20,6 @@ import { Panel } from "@/components/ui/Panel";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { getAuctionStatusLabel } from "@/lib/status";
 import { formatDateTime } from "@/lib/datetime";
-import { formatScore } from "@/lib/score";
 
 type AuctionDetail = {
   auctionId: number;
@@ -789,7 +788,7 @@ export default function AuctionDetailPage() {
           </Panel>
           <div style={{ marginTop: 16 }}>
             판매자 <strong>{auction.seller.nickname}</strong> (평점{" "}
-            {formatScore(auction.seller.reputationScore)})
+            {auction.seller.reputationScore})
           </div>
           {auction.seller.id ? (
             <div className="actions" style={{ marginTop: 8 }}>

@@ -352,13 +352,16 @@ export default function ChatPage() {
             (r) => r.roomId === pendingRoomId && r.opponentNickname === "불러오는 중..."
         );
 
-        if (!placeholderRoom || !pendingItemId || !pendingTxType) return;
+        if (!placeholderRoom || !pendingItemId) return;
+
+        // Default to POST if txType is missing from URL (common for used trade items)
+        const txType = pendingTxType || "POST";
 
         let isMounted = true;
         const fetchMissingDetails = async () => {
             try {
                 const endpoint =
-                    pendingTxType === "AUCTION"
+                    txType === "AUCTION"
                         ? `/api/v1/auctions/${pendingItemId}`
                         : `/api/v1/posts/${pendingItemId}`;
 
@@ -367,12 +370,19 @@ export default function ChatPage() {
                 if (!isMounted || !rsData?.data) return;
 
                 const data = rsData.data;
-                const itemName = pendingTxType === "AUCTION" ? data.name : data.title;
+                const itemName = txType === "AUCTION" ? data.name : data.title;
                 const itemPrice =
-                    pendingTxType === "AUCTION"
+                    txType === "AUCTION"
                         ? data.currentHighestBid || data.startPrice
                         : data.price;
-                const opponentNickname = data.sellerNickname || "판매자";
+
+                // AuctionDetailResponse has seller.nickname, PostDetailResponse has sellerNickname
+                const opponentNickname = txType === "AUCTION"
+                    ? data.seller?.nickname
+                    : data.sellerNickname;
+
+                const finalNickname = opponentNickname || (txType === "AUCTION" ? "판매자" : "상대방");
+
                 const itemImageUrl =
                     data.imageUrls && data.imageUrls.length > 0 ? data.imageUrls[0] : null;
 
@@ -383,7 +393,7 @@ export default function ChatPage() {
                                 ...room,
                                 itemName,
                                 itemPrice,
-                                opponentNickname,
+                                opponentNickname: finalNickname,
                                 itemImageUrl,
                             }
                             : room
@@ -391,6 +401,14 @@ export default function ChatPage() {
                 );
             } catch (e) {
                 console.error("실시간 상세 정보 가져오기 실패:", e);
+                // Prevent infinite loading by setting at least some data
+                setRooms((prev) =>
+                    prev.map((room) =>
+                        room.roomId === pendingRoomId && room.opponentNickname === "불러오는 중..."
+                            ? { ...room, opponentNickname: "정보 없음", itemName: "정보를 불러올 수 없음" }
+                            : room
+                    )
+                );
             }
         };
 
@@ -809,7 +827,7 @@ export default function ChatPage() {
                             <button
                                 key={room.roomId}
                                 className={`chat-room-item ${selectedRoomId === room.roomId ? "active" : ""
-                                }`}
+                                    }`}
                                 onClick={() => setSelectedRoomId(room.roomId)}
                             >
                                 <img
@@ -947,7 +965,7 @@ export default function ChatPage() {
                                 </div>
                                 <Link
                                     href={`/${selectedRoom?.txType === "AUCTION" ? "auctions" : "posts"
-                                    }/${selectedRoom?.itemId}`}
+                                        }/${selectedRoom?.itemId}`}
                                 >
                                     <button className="chat-product-buy-btn">구매하기</button>
                                 </Link>

@@ -17,7 +17,8 @@ export default function PublicShell({
       <div className="page">
         <header className="header">
           <div className="container header-inner">
-            <Link className="logo" href="/">
+            <Link className="logo" href="/" style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "32px" }}>
+              <img src="/logo.png" alt="고구마 로고" style={{ height: "40px", width: "auto" }} />
               고구마 마켓
             </Link>
             <nav className="nav">
