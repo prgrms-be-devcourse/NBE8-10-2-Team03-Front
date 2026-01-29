@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthProvider, type MemberMe } from "@/components/auth/AuthContext";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, resolveImageUrl } from "@/lib/api";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Panel } from "@/components/ui/Panel";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
@@ -75,20 +75,42 @@ export default function ProtectedLayout({
   };
 
   return (
-    <AuthProvider me={me}>
+    <AuthProvider me={me} setMe={setMe}>
       <div className="page">
         <header className="header">
           <div className="container header-inner">
-            <Link className="logo" href="/">
+            <Link className="logo" href="/" style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "32px" }}>
+              <img src="/logo.png" alt="고구마 로고" style={{ height: "40px", width: "auto" }} />
               고구마 마켓
             </Link>
             <div className="actions">
               {authStatus === "checking" ? (
                 <SkeletonLine width={140} />
               ) : (
-                <span className="tag">
-                  {me?.name || me?.username || "사용자"}
-                </span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                  <div
+                    style={{
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "50%",
+                      backgroundColor: "var(--bg-strong)",
+                      overflow: "hidden",
+                      border: "1px solid var(--border)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <img
+                      src={resolveImageUrl(me?.profileImgUrl)}
+                      alt="프로필"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  </div>
+                  <span style={{ fontSize: "12px", fontWeight: 600 }}>
+                    {me?.name || me?.username || "사용자"}
+                  </span>
+                </div>
               )}
               <button
                 className="btn btn-ghost"

@@ -2,22 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiRequest, buildApiUrl, getAuthHeaders, safeJson } from "@/lib/api";
+import { apiRequest, buildApiUrl, getAuthHeaders, parseRsData, resolveImageUrl, safeJson } from "@/lib/api";
+import { useAuth, type MemberMe } from "@/components/auth/AuthContext";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { formatDateTime } from "@/lib/datetime";
-import { formatScore } from "@/lib/score";
 
-type MemberMe = {
-  id: number;
-  username: string;
-  name: string;
-  score: number | null;
-  createDate: string;
-  modifyDate: string;
-};
+// Local type definition removed in favor of imported MemberMe
 
 type PostListItem = {
   id: number;
@@ -86,7 +79,8 @@ const formatNumber = (value: number | null | undefined) => {
 
 export default function MyPage() {
   const router = useRouter();
-  const [me, setMe] = useState<MemberMe | null>(null);
+  const { me, setMe: setGlobalMe } = useAuth()!;
+  // Local state me removed in favor of global me from AuthContext
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
@@ -101,6 +95,9 @@ export default function MyPage() {
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [profileImgError, setProfileImgError] = useState<string | null>(null);
+  const [profileImgSuccess, setProfileImgSuccess] = useState<string | null>(null);
+  const [isProfileImgLoading, setIsProfileImgLoading] = useState(false);
 
   const [postStatusFilter, setPostStatusFilter] = useState("all");
   const [postPage, setPostPage] = useState(0);
@@ -124,47 +121,13 @@ export default function MyPage() {
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [isReviewsLoading, setIsReviewsLoading] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchMe = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-    try {
-      const response = await fetch(buildApiUrl("/api/v1/members/me"), {
-        method: "GET",
-        headers: getAuthHeaders(),
-        credentials: "include",
-      });
-        if (!response.ok) {
-          setErrorMessage("내 정보를 불러오지 못했습니다.");
-          return;
-        }
-        const json = await safeJson<MemberMe>(response);
-        if (!json) {
-          setErrorMessage("응답 파싱에 실패했습니다.");
-          return;
-        }
-        if (!isMounted) return;
-        setMe(json);
-      } catch {
-        if (isMounted) {
-          setErrorMessage("네트워크 오류가 발생했습니다.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-    fetchMe();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  // Removed local fetchMe effect to rely on ProtectedLayout's global fetch or manual refreshes
+  // This prevents double fetching on mount and ensures state consistency
 
   useEffect(() => {
     if (me) {
       setNickname(me.name);
+      setIsLoading(false); // Ensure loading is cleared when global me is available
     }
   }, [me]);
 
@@ -320,7 +283,7 @@ export default function MyPage() {
         setNicknameError(apiError || "닉네임 수정에 실패했습니다.");
         return;
       }
-      setMe((prev) => (prev ? { ...prev, name: trimmedNickname } : prev));
+      setGlobalMe(me ? { ...me, name: trimmedNickname } : null);
       setNicknameSuccess(rsData.msg || "닉네임이 수정되었습니다.");
     } catch {
       setNicknameError("네트워크 오류가 발생했습니다.");
@@ -378,6 +341,59 @@ export default function MyPage() {
       setPasswordError("네트워크 오류가 발생했습니다.");
     } finally {
       setIsPasswordLoading(false);
+    }
+  };
+
+  const handleProfileImgChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProfileImgLoading(true);
+    setProfileImgError(null);
+    setProfileImgSuccess(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("profileImg", file);
+
+      const { rsData, errorMessage: apiError, response } = await apiRequest<unknown>("/api/v1/members/me/profile", {
+        method: "PATCH",
+        body: formData,
+      });
+
+      if (!response.ok || apiError || !rsData) {
+        setProfileImgError(apiError || "프로필 이미지 수정에 실패했습니다.");
+        return;
+      }
+
+      // Optimistically update the UI with the local blob URL
+      // This ensures the image reflects immediately even if the backend DTO is missing the field
+      const blobUrl = URL.createObjectURL(file);
+      if (me) {
+        setGlobalMe({ ...me, profileImgUrl: blobUrl });
+      }
+
+      // Re-fetch 'me' info to update the UI
+      const currentProfileImgUrl = me?.profileImgUrl;
+      const { rsData: meRsData, response: meResponse } = await apiRequest<MemberMe>("/api/v1/members/me");
+      if (meResponse.ok && meRsData?.data) {
+        // NOTE: Backend DTO (MemberWithUsernameDto) might be missing profileImgUrl.
+        // We ensure we keep the current URL (could be a blob URL or previous server URL)
+        // if the re-fetch doesn't provide it.
+        const updatedMe = {
+          ...meRsData.data,
+          profileImgUrl: meRsData.data.profileImgUrl || currentProfileImgUrl
+        };
+        setGlobalMe(updatedMe);
+      }
+
+      setProfileImgSuccess(rsData.msg || "프로필 이미지가 수정되었습니다.");
+    } catch {
+      setProfileImgError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setIsProfileImgLoading(false);
+      // Reset input value so same file can be selected again
+      event.target.value = "";
     }
   };
 
@@ -458,17 +474,67 @@ export default function MyPage() {
       <div className="grid-2">
         <Card>
           <h2 style={{ marginTop: 0 }}>프로필</h2>
-          <div>
-            <strong>{me.name}</strong> ({me.username})
-          </div>
-          <div className="muted" style={{ marginTop: 8 }}>
-            가입일: {formatDateTime(me.createDate)}
+          <div style={{ display: "flex", gap: "24px", alignItems: "center", marginTop: 24 }}>
+            <div style={{ flex: 7, display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ fontSize: "20px", fontWeight: 700, lineHeight: 1.2 }}>
+                {me.name} ({me.username})
+              </div>
+              <div className="muted">
+                가입일: {me.createDate.split("T")[0]}
+              </div>
+            </div>
+            <div style={{ flex: 3, display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  width: "100px",
+                  height: "100px",
+                  borderRadius: "50%",
+                  backgroundColor: "var(--bg-strong)",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid var(--border)",
+                  marginBottom: "0",
+                }}
+              >
+                <img
+                  src={resolveImageUrl(me.profileImgUrl)}
+                  alt="프로필"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </div>
+              <label
+                className="btn btn-ghost"
+                style={{
+                  fontSize: "14px",
+                  padding: "4px 12px",
+                  cursor: isProfileImgLoading ? "not-allowed" : "pointer",
+                  display: "inline-block"
+                }}
+              >
+                {isProfileImgLoading ? "업로드 중..." : "프로필 변경"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={handleProfileImgChange}
+                  disabled={isProfileImgLoading}
+                />
+              </label>
+              {profileImgError ? (
+                <div style={{ color: "var(--error)", fontSize: "12px", textAlign: "center" }}>{profileImgError}</div>
+              ) : null}
+              {profileImgSuccess ? (
+                <div style={{ color: "var(--success)", fontSize: "12px", textAlign: "center" }}>{profileImgSuccess}</div>
+              ) : null}
+            </div>
           </div>
         </Card>
         <Card>
-          <h2 style={{ marginTop: 0 }}>고구마 온도</h2>
+          <h2 style={{ marginTop: 0 }}>신뢰도</h2>
           <div style={{ fontSize: 32, fontWeight: 700 }}>
-            {formatScore(me.score)}
+            {me.score === null ? "-" : me.score.toFixed(1)}
           </div>
         </Card>
         <Card>
@@ -509,6 +575,7 @@ export default function MyPage() {
             </button>
           </form>
         </Card>
+
         <Card>
           <h2 style={{ marginTop: 0 }}>비밀번호 수정</h2>
           <form onSubmit={handlePasswordSubmit}>
@@ -820,7 +887,7 @@ export default function MyPage() {
             >
               {reviews.map((review) => (
                 <div key={review.id} className="card">
-                  <div className="muted">평점 {formatScore(review.score)}</div>
+                  <div className="muted">평점 {review.score}</div>
                   <div style={{ marginTop: 6 }}>
                     {review.comment || "내용 없음"}
                   </div>

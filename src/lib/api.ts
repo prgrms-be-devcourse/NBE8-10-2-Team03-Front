@@ -98,3 +98,11 @@ export function parseFieldErrors(msg: string): Record<string, string> {
     }
     return fieldErrors;
 }
+export const DEFAULT_PROFILE_URL =
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%23e0e0e0'/%3E%3Ccircle cx='24' cy='18' r='8' fill='%23bdbdbd'/%3E%3Cellipse cx='24' cy='38' rx='14' ry='10' fill='%23bdbdbd'/%3E%3C/svg%3E";
+
+export function resolveImageUrl(url?: string | null): string {
+    if (!url) return DEFAULT_PROFILE_URL;
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    return buildApiUrl(url);
+}

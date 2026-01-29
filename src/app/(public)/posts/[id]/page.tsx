@@ -18,7 +18,6 @@ import { Panel } from "@/components/ui/Panel";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { getPostStatusLabel } from "@/lib/status";
 import { formatDateTime } from "@/lib/datetime";
-import { formatScore } from "@/lib/score";
 
 type PostDetail = {
   id: number;
@@ -332,7 +331,7 @@ export default function PostDetailPage() {
             </div>
           ) : null}
           <div className="muted" style={{ marginTop: 6 }}>
-            고구마 온도 {formatScore(post.sellerScore)}
+            신용 점수 {post.sellerScore ?? "-"}
           </div>
           {post.sellerBadge ? (
             <div className="tag" style={{ marginTop: 8 }}>
