@@ -17,6 +17,7 @@ import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Panel } from "@/components/ui/Panel";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { getPostStatusLabel } from "@/lib/status";
+import { formatDateTime } from "@/lib/datetime";
 
 type PostDetail = {
   id: number;
@@ -305,13 +306,16 @@ export default function PostDetailPage() {
           )}
         </Card>
         <Card>
+          <div className="tag" style={{ marginTop: 0, marginBottom: 8 }}>
+            {post.categoryName}
+          </div>
           <h1 style={{ marginTop: 0 }}>{post.title}</h1>
-          <div className="tag">{post.categoryName}</div>
           <p style={{ marginTop: 12 }}>{post.content}</p>
           <div className="muted">
             {post.price.toLocaleString()}원 ·{" "}
             {post.statusDisplayName || getPostStatusLabel(post.status)} ·{" "}
-            {post.createDate} · 조회 {post.viewCount.toLocaleString()}
+            {formatDateTime(post.createDate)} · 조회{" "}
+            {post.viewCount.toLocaleString()}
           </div>
           <div style={{ marginTop: 16 }}>
             판매자 <strong>{post.sellerNickname}</strong>

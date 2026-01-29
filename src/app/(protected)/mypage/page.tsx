@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { formatDateTime } from "@/lib/datetime";
 
 type MemberMe = {
   id: number;
@@ -460,11 +461,11 @@ export default function MyPage() {
             <strong>{me.name}</strong> ({me.username})
           </div>
           <div className="muted" style={{ marginTop: 8 }}>
-            가입일: {me.createDate}
+            가입일: {formatDateTime(me.createDate)}
           </div>
         </Card>
         <Card>
-          <h2 style={{ marginTop: 0 }}>점수</h2>
+          <h2 style={{ marginTop: 0 }}>신뢰도</h2>
           <div style={{ fontSize: 32, fontWeight: 700 }}>
             {me.score === null ? "-" : me.score}
           </div>
@@ -631,7 +632,7 @@ export default function MyPage() {
                   </div>
                   <div style={{ marginTop: 6 }}>{post.title}</div>
                   <div className="muted" style={{ marginTop: 6 }}>
-                    {formatNumber(post.price)}원 · {post.createDate}
+                    {formatNumber(post.price)}원 · {formatDateTime(post.createDate)}
                   </div>
                   {post.sellerBadge ? (
                     <div className="tag" style={{ marginTop: 8 }}>
@@ -730,8 +731,11 @@ export default function MyPage() {
                   <div className="muted">{auction.status}</div>
                   <div style={{ marginTop: 6 }}>{auction.name}</div>
                   <div className="muted" style={{ marginTop: 6 }}>
-                    현재가 {formatNumber(auction.currentHighestBid)}원 · 입찰{" "}
-                    {auction.bidCount}건
+                    현재가{" "}
+                    {formatNumber(
+                      auction.currentHighestBid ?? auction.startPrice
+                    )}
+                    원 · 입찰 {auction.bidCount}건
                   </div>
                 </button>
               ))}
@@ -804,7 +808,7 @@ export default function MyPage() {
                     {review.comment || "내용 없음"}
                   </div>
                   <div className="muted" style={{ marginTop: 6 }}>
-                    {review.createDate}
+                    {formatDateTime(review.createDate)}
                   </div>
                 </div>
               ))}

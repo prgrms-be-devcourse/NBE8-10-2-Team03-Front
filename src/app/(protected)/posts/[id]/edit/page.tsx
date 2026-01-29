@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { CATEGORIES } from "@/lib/categories";
 
 type PostDetail = {
   id: number;
@@ -75,8 +76,10 @@ export default function PostEditPage() {
           return;
         }
         const data = rsData.data;
+        const resolvedCategoryId =
+          CATEGORIES.find((item) => item.name === data.categoryName)?.id ?? null;
         setForm({
-          categoryId: "",
+          categoryId: resolvedCategoryId ? String(resolvedCategoryId) : "",
           title: data.title ?? "",
           content: data.content ?? "",
           price: typeof data.price === "number" ? String(data.price) : "",
@@ -210,15 +213,21 @@ export default function PostEditPage() {
           <div className="field-row">
             <div className="field">
               <label className="label" htmlFor="categoryId">
-                카테고리 ID
+                카테고리
               </label>
-              <input
+              <select
                 id="categoryId"
-                className="input"
+                className="select"
                 value={form.categoryId}
                 onChange={(event) => updateField("categoryId", event.target.value)}
-                placeholder="예: 1"
-              />
+              >
+                <option value="">선택하세요</option>
+                {CATEGORIES.map((item) => (
+                  <option key={item.id} value={String(item.id)}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
               {fieldErrors?.categoryId ? (
                 <span className="error">{fieldErrors.categoryId}</span>
               ) : null}

@@ -18,7 +18,7 @@ export default function PublicShell({
         <header className="header">
           <div className="container header-inner">
             <Link className="logo" href="/">
-              C2C MARKET
+              고구마 마켓
             </Link>
             <nav className="nav">
               <Link href="/posts">중고거래</Link>

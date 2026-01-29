@@ -80,7 +80,7 @@ export default function ProtectedLayout({
         <header className="header">
           <div className="container header-inner">
             <Link className="logo" href="/">
-              C2C MARKET
+              고구마 마켓
             </Link>
             <div className="actions">
               {authStatus === "checking" ? (

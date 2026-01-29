@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Panel } from "@/components/ui/Panel";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { formatDateTime } from "@/lib/datetime";
 
 type ChatDto = {
   id?: number;
@@ -92,6 +93,8 @@ export default function ChatPage() {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
   const [isReviewSubmitting, setIsReviewSubmitting] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
+  const [reviewRefreshTick, setReviewRefreshTick] = useState(0);
 
   const pendingRoomId = searchParams?.get("roomId");
   const pendingItemId = searchParams?.get("itemId");
@@ -106,10 +109,13 @@ export default function ChatPage() {
     return `reviewed:${selectedRoomId}:${selectedRoom.opponentId}`;
   }, [selectedRoomId, selectedRoom?.opponentId]);
 
-  const hasReviewed = useMemo(() => {
-    if (!reviewStorageKey || typeof window === "undefined") return false;
-    return localStorage.getItem(reviewStorageKey) === "1";
-  }, [reviewStorageKey]);
+  useEffect(() => {
+    if (!reviewStorageKey || typeof window === "undefined") {
+      setHasReviewed(false);
+      return;
+    }
+    setHasReviewed(localStorage.getItem(reviewStorageKey) === "1");
+  }, [reviewStorageKey, reviewRefreshTick]);
 
   useEffect(() => {
     if (pendingRoomId && !selectedRoomId) {
@@ -397,6 +403,8 @@ export default function ChatPage() {
         localStorage.setItem(reviewStorageKey, "1");
       }
       setReviewSuccess(rsData.msg || "리뷰 작성이 완료되었습니다.");
+      setHasReviewed(true);
+      setReviewRefreshTick((prev) => prev + 1);
       setIsReviewOpen(false);
     } catch {
       setReviewError("네트워크 오류가 발생했습니다.");
@@ -516,7 +524,9 @@ export default function ChatPage() {
                     {room.lastMessage || "마지막 메시지 없음"}
                   </div>
                   <div className="muted" style={{ marginTop: 6 }}>
-                    {room.lastMessageAt || "시간 정보 없음"}
+                    {room.lastMessageAt
+                      ? formatDateTime(room.lastMessageAt)
+                      : "시간 정보 없음"}
                   </div>
                   <div className="muted" style={{ marginTop: 6 }}>
                     방 ID: {room.roomId}
@@ -569,7 +579,7 @@ export default function ChatPage() {
                       (message.senderId !== undefined
                         ? `#${message.senderId}`
                         : "알 수 없음"))}{" "}
-                    · {message.createDate}
+                    · {formatDateTime(message.createDate)}
                   </div>
                   <div>{message.message}</div>
                   {message.imageUrls && message.imageUrls.length > 0 ? (

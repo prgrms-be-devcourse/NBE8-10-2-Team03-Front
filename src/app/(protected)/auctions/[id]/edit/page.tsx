@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { CATEGORIES } from "@/lib/categories";
 
 type AuctionDetail = {
   auctionId: number;
@@ -56,6 +57,7 @@ export default function AuctionEditPage() {
     startPrice: "",
     buyNowPrice: "",
     endAt: "",
+    categoryId: "",
     images: [] as File[],
   });
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
@@ -111,6 +113,8 @@ export default function AuctionEditPage() {
           setErrorMessage("잘못된 접근입니다.");
           return;
         }
+        const resolvedCategoryId =
+          CATEGORIES.find((item) => item.name === data.categoryName)?.id ?? null;
         setForm({
           name: data.name ?? "",
           description: data.description ?? "",
@@ -119,6 +123,7 @@ export default function AuctionEditPage() {
           buyNowPrice:
             typeof data.buyNowPrice === "number" ? String(data.buyNowPrice) : "",
           endAt: toInputDateTime(data.endAt),
+          categoryId: resolvedCategoryId ? String(resolvedCategoryId) : "",
           images: [],
         });
         const urls = data.imageUrls ?? [];
@@ -146,6 +151,7 @@ export default function AuctionEditPage() {
     const description = form.description.trim();
     const startPrice = Number(form.startPrice);
     const buyNowPrice = form.buyNowPrice ? Number(form.buyNowPrice) : null;
+    const categoryId = Number(form.categoryId);
 
     if (!name) errors.name = "상품명은 필수입니다.";
     if (!description) errors.description = "설명은 필수입니다.";
@@ -157,6 +163,9 @@ export default function AuctionEditPage() {
       (buyNowPrice === null || Number.isNaN(buyNowPrice) || buyNowPrice < 0)
     ) {
       errors.buyNowPrice = "즉시구매가는 0 이상 숫자여야 합니다.";
+    }
+    if (!form.categoryId || Number.isNaN(categoryId)) {
+      errors.categoryId = "카테고리는 필수입니다.";
     }
     setFieldErrors(Object.keys(errors).length ? errors : null);
     return Object.keys(errors).length === 0;
@@ -176,6 +185,7 @@ export default function AuctionEditPage() {
     if (form.buyNowPrice) {
       body.append("buyNowPrice", String(Number(form.buyNowPrice)));
     }
+    body.append("categoryId", String(Number(form.categoryId)));
     if (form.endAt) {
       body.append("endAt", form.endAt);
     }
@@ -302,6 +312,29 @@ export default function AuctionEditPage() {
               />
               {fieldErrors?.buyNowPrice ? (
                 <span className="error">{fieldErrors.buyNowPrice}</span>
+              ) : null}
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="categoryId">
+                카테고리
+              </label>
+              <select
+                id="categoryId"
+                className="select"
+                value={form.categoryId}
+                onChange={(event) =>
+                  updateField("categoryId", event.target.value)
+                }
+              >
+                <option value="">선택하세요</option>
+                {CATEGORIES.map((item) => (
+                  <option key={item.id} value={String(item.id)}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors?.categoryId ? (
+                <span className="error">{fieldErrors.categoryId}</span>
               ) : null}
             </div>
           </div>

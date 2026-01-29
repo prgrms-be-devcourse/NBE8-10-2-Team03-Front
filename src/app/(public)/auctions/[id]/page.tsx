@@ -19,6 +19,7 @@ import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Panel } from "@/components/ui/Panel";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { getAuctionStatusLabel } from "@/lib/status";
+import { formatDateTime } from "@/lib/datetime";
 
 type AuctionDetail = {
   auctionId: number;
@@ -534,11 +535,16 @@ export default function AuctionDetailPage() {
         </Card>
         <Card>
           <div className="tag">{getAuctionStatusLabel(auction.status)}</div>
+          {auction.categoryName ? (
+            <div className="tag" style={{ marginTop: 8 }}>
+              {auction.categoryName}
+            </div>
+          ) : null}
           <h1 style={{ marginTop: 8 }}>{auction.name}</h1>
           <p>{auction.description}</p>
           <div className="muted">
             시작가 {formatNumber(auction.startPrice)}원 · 현재가{" "}
-            {formatNumber(auction.currentHighestBid)}원
+            {formatNumber(auction.currentHighestBid ?? auction.startPrice)}원
           </div>
           {auction.buyNowPrice !== null && auction.buyNowPrice !== undefined ? (
             <div className="muted">
@@ -546,15 +552,17 @@ export default function AuctionDetailPage() {
             </div>
           ) : null}
           <div className="muted">
-            입찰 {auction.bidCount}건 · 시작 {auction.startAt} · 종료{" "}
-            {auction.endAt}
+            입찰 {auction.bidCount}건 · 시작 {formatDateTime(auction.startAt)} ·
+            종료 {formatDateTime(auction.endAt)}
           </div>
           {auction.status === "COMPLETED" ? (
             <Panel style={{ marginTop: 16 }}>
               <h3 style={{ marginTop: 0 }}>낙찰 정보</h3>
               <div className="muted">낙찰자 {winnerNickname}</div>
               <div>낙찰가 {formatNumber(winningPrice)}원</div>
-              <div className="muted">낙찰 시간 {winningAt || "-"}</div>
+              <div className="muted">
+                낙찰 시간 {winningAt ? formatDateTime(winningAt) : "-"}
+              </div>
               {canStartChat ? (
                 <div className="actions" style={{ marginTop: 12 }}>
                   <button
@@ -581,7 +589,10 @@ export default function AuctionDetailPage() {
                   auction.cancellerRole ||
                   "-"}
               </div>
-              <div className="muted">취소 시간 {auction.closedAt || "-"}</div>
+              <div className="muted">
+                취소 시간{" "}
+                {auction.closedAt ? formatDateTime(auction.closedAt) : "-"}
+              </div>
             </Panel>
           ) : null}
           {!isSeller ? (
@@ -705,7 +716,7 @@ export default function AuctionDetailPage() {
                 {bids.map((bid) => (
                   <div key={bid.bidId}>
                     <div className="muted">
-                      {bid.bidderNickname} · {bid.createdAt}
+                      {bid.bidderNickname} · {formatDateTime(bid.createdAt)}
                     </div>
                     <div>{formatNumber(bid.price)}원</div>
                   </div>
@@ -744,11 +755,6 @@ export default function AuctionDetailPage() {
               </div>
             ) : null}
           </Panel>
-          {auction.categoryName ? (
-            <div className="tag" style={{ marginTop: 8 }}>
-              {auction.categoryName}
-            </div>
-          ) : null}
           <div style={{ marginTop: 16 }}>
             판매자 <strong>{auction.seller.nickname}</strong> (평점{" "}
             {auction.seller.reputationScore})

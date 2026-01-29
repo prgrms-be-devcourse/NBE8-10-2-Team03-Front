@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { apiRequest, parseFieldErrors } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { CATEGORIES } from "@/lib/categories";
 
 export default function AuctionWritePage() {
   const router = useRouter();
@@ -186,17 +187,23 @@ export default function AuctionWritePage() {
           <div className="field-row" style={{ marginTop: 16 }}>
             <div className="field">
               <label className="label" htmlFor="categoryId">
-                카테고리 ID
+                카테고리
               </label>
-              <input
+              <select
                 id="categoryId"
-                className="input"
+                className="select"
                 value={form.categoryId}
                 onChange={(event) =>
                   updateField("categoryId", event.target.value)
                 }
-                placeholder=" 2"
-              />
+              >
+                <option value="">선택하세요</option>
+                {CATEGORIES.map((item) => (
+                  <option key={item.id} value={String(item.id)}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
               {fieldErrors?.categoryId ? (
                 <span className="error">{fieldErrors.categoryId}</span>
               ) : null}

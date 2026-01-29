@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { getAuctionStatusLabel } from "@/lib/status";
+import { CATEGORIES } from "@/lib/categories";
+import { formatDateTime } from "@/lib/datetime";
 
 type AuctionItem = {
   auctionId: number;
@@ -26,6 +28,8 @@ type AuctionItem = {
     nickname: string;
     reputationScore: number;
   };
+  sellerNickname?: string;
+  sellerBadge?: string;
   categoryName?: string;
 };
 
@@ -46,6 +50,8 @@ type SearchItem = {
   categoryName?: string;
   thumbnailUrl?: string;
   createDate: string;
+  sellerNickname?: string;
+  sellerBadge?: string;
 };
 
 type SearchResponse = {
@@ -55,21 +61,6 @@ type SearchResponse = {
   totalElements?: number;
   totalPages?: number;
 };
-
-const CATEGORIES = [
-  { id: 1, name: "디지털기기" },
-  { id: 2, name: "생활가전" },
-  { id: 3, name: "가구/인테리어" },
-  { id: 4, name: "생활/주방" },
-  { id: 5, name: "여성의류" },
-  { id: 6, name: "남성패션/잡화" },
-  { id: 7, name: "유아동" },
-  { id: 8, name: "스포츠/레저" },
-  { id: 9, name: "도서" },
-  { id: 10, name: "게임/취미" },
-  { id: 11, name: "반려동물용품" },
-  { id: 12, name: "기타 중고물품" },
-];
 
 const formatNumber = (value: number | null | undefined) => {
   if (value === null || value === undefined) return "-";
@@ -159,6 +150,8 @@ export default function AuctionsPage() {
               status: item.status ?? "OPEN",
               endAt: item.createDate,
               bidCount: 0,
+              sellerNickname: item.sellerNickname,
+              sellerBadge: item.sellerBadge,
               categoryName: item.categoryName,
             }))
           );
@@ -409,12 +402,23 @@ export default function AuctionsPage() {
                     <div className="tag">{auction.categoryName || "경매"}</div>
                     <h3 style={{ margin: "12px 0 6px" }}>{auction.name}</h3>
                     <div className="muted">
-                      {formatNumber(auction.currentHighestBid)}원 ·{" "}
-                      {getAuctionStatusLabel(auction.status)} · {auction.endAt}
+                      {formatNumber(
+                        auction.currentHighestBid ?? auction.startPrice
+                      )}
+                      원 · {getAuctionStatusLabel(auction.status)}
+                    </div>
+                    <div className="muted" style={{ marginTop: 4 }}>
+                      {formatDateTime(auction.endAt)}
                     </div>
                     <div className="muted" style={{ marginTop: 6 }}>
-                      입찰 {formatNumber(auction.bidCount)}건
+                      입찰 {formatNumber(auction.bidCount)}건 · 판매자{" "}
+                      {auction.seller?.nickname || auction.sellerNickname || "-"}
                     </div>
+                    {auction.sellerBadge ? (
+                      <div className="tag" style={{ marginTop: 8 }}>
+                        {auction.sellerBadge}
+                      </div>
+                    ) : null}
                   </Link>
                 ))}
               </div>

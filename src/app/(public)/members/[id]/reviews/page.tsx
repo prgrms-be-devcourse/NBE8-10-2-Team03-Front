@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { formatDateTime } from "@/lib/datetime";
 
 type ReviewDto = {
   id: number;
@@ -115,7 +116,7 @@ export default function MemberReviewsPage() {
                   {review.comment || "코멘트 없음"}
                 </div>
                 <div className="muted" style={{ marginTop: 6 }}>
-                  {review.createDate}
+                  {formatDateTime(review.createDate)}
                 </div>
               </div>
             ))}

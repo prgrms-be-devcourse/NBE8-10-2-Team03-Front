@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { getPostStatusLabel } from "@/lib/status";
+import { CATEGORIES } from "@/lib/categories";
+import { formatDateTime } from "@/lib/datetime";
 
 type PostItem = {
   id: number;
@@ -56,21 +58,6 @@ type SearchResponse = {
   totalElements?: number;
   totalPages?: number;
 };
-
-const CATEGORIES = [
-  { id: 1, name: "디지털기기" },
-  { id: 2, name: "생활가전" },
-  { id: 3, name: "가구/인테리어" },
-  { id: 4, name: "생활/주방" },
-  { id: 5, name: "여성의류" },
-  { id: 6, name: "남성패션/잡화" },
-  { id: 7, name: "유아동" },
-  { id: 8, name: "스포츠/레저" },
-  { id: 9, name: "도서" },
-  { id: 10, name: "게임/취미" },
-  { id: 11, name: "반려동물용품" },
-  { id: 12, name: "기타 중고물품" },
-];
 
 const formatNumber = (value: number | null | undefined) => {
   if (value === null || value === undefined) return "-";
@@ -414,8 +401,10 @@ export default function PostsPage() {
                     <h3 style={{ margin: "12px 0 6px" }}>{post.title}</h3>
                     <div className="muted">
                       {formatNumber(post.price)}원 ·{" "}
-                      {post.statusDisplayName || getPostStatusLabel(post.status)} ·{" "}
-                      {post.createDate}
+                      {post.statusDisplayName || getPostStatusLabel(post.status)}
+                    </div>
+                    <div className="muted" style={{ marginTop: 4 }}>
+                      {formatDateTime(post.createDate)}
                     </div>
                     <div className="muted" style={{ marginTop: 6 }}>
                       조회 {formatNumber(post.viewCount)} · 판매자{" "}
