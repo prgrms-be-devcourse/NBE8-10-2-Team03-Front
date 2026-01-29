@@ -112,6 +112,8 @@ export default function AuctionDetailPage() {
   const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [wsToken, setWsToken] = useState<string | null>(null);
+  const [isWsTokenLoading, setIsWsTokenLoading] = useState(false);
 
   const auctionId = useMemo(() => {
     const raw = params?.id;
@@ -220,19 +222,39 @@ export default function AuctionDetailPage() {
     }
   }, [auction]);
 
+  // WebSocket 토큰 (HttpOnly 쿠키 대응) 가져오기
   useEffect(() => {
-    if (!auctionId) return;
+    if (!auth?.me || wsToken) return;
+
+    let isMounted = true;
+    const fetchWsToken = async () => {
+      try {
+        setIsWsTokenLoading(true);
+        const { rsData } = await apiRequest<any>("/api/v1/members/ws-token");
+        if (isMounted && rsData?.data?.token) {
+          setWsToken(rsData.data.token);
+        }
+      } catch (e) {
+        console.error("Failed to fetch WebSocket token:", e);
+      } finally {
+        if (isMounted) setIsWsTokenLoading(false);
+      }
+    };
+
+    fetchWsToken();
+    return () => {
+      isMounted = false;
+    };
+  }, [auth?.me, wsToken]);
+
+  useEffect(() => {
+    if (!auctionId || !wsToken) return;
     if (typeof window === "undefined") return;
-    const accessToken =
-      localStorage.getItem("wsAccessToken")?.trim() ||
-      localStorage.getItem("accessToken")?.trim() ||
-      "";
-    if (!accessToken) return;
 
     const client = new Client({
       webSocketFactory: () => new SockJS(buildApiUrl("/ws")),
       connectHeaders: {
-        token: `Bearer ${accessToken}`,
+        token: `Bearer ${wsToken}`,
       },
       reconnectDelay: 5000,
       debug: (message) => {
@@ -308,7 +330,7 @@ export default function AuctionDetailPage() {
     return () => {
       client.deactivate();
     };
-  }, [auctionId, bidPageSize, loadAuctionDetail]);
+  }, [auctionId, bidPageSize, loadAuctionDetail, wsToken]);
 
   const handleBidSubmit = async () => {
     if (!auctionId || isBidSubmitting) return;
@@ -620,14 +642,24 @@ export default function AuctionDetailPage() {
                 </div>
               ) : null}
               <div className="actions" style={{ marginTop: 12 }}>
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={handleBidSubmit}
-                  disabled={isBidSubmitting || !isAuctionOpen}
-                >
-                  {isBidSubmitting ? "입찰 중..." : "입찰하기"}
-                </button>
+                {auth?.me ? (
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    onClick={handleBidSubmit}
+                    disabled={isBidSubmitting || !isAuctionOpen}
+                  >
+                    {isBidSubmitting ? "입찰 중..." : "입찰하기"}
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-ghost"
+                    type="button"
+                    onClick={() => router.push("/login")}
+                  >
+                    로그인 후 입찰 가능
+                  </button>
+                )}
               </div>
               {!isAuctionOpen ? (
                 <div className="muted" style={{ marginTop: 8 }}>
@@ -733,21 +765,20 @@ export default function AuctionDetailPage() {
                   이전
                 </button>
                 <span className="muted">
-                  {bidPage + 1} / {bidsPageData.totalPages} (총{" "}
-                  {bidsPageData.totalElements}건)
+                  {bidPage + 1} / {bidsPageData?.totalPages ?? 1} (총{" "}
+                  {bidsPageData?.totalElements ?? 0}건)
                 </span>
                 <button
                   className="btn btn-ghost"
                   onClick={() =>
-                    setBidPage((prev) =>
-                      bidsPageData.totalPages
-                        ? Math.min(prev + 1, bidsPageData.totalPages - 1)
-                        : prev + 1
-                    )
+                    setBidPage((prev) => {
+                      const totalPages = bidsPageData?.totalPages ?? 1;
+                      return Math.min(prev + 1, totalPages - 1);
+                    })
                   }
                   disabled={
-                    bidsPageData.totalPages > 0 &&
-                    bidPage >= bidsPageData.totalPages - 1
+                    (bidsPageData?.totalPages ?? 0) > 0 &&
+                    bidPage >= (bidsPageData?.totalPages ?? 0) - 1
                   }
                 >
                   다음

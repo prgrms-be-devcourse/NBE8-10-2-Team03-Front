@@ -15,30 +15,87 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isKakaoLoading, setIsKakaoLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string> | null>(
+    null
+  );
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const validate = () => {
+    const errors: Record<string, string> = {};
     const trimmedUsername = username.trim();
     const trimmedNickname = nickname.trim();
-    if (!trimmedUsername || !trimmedNickname || !password) {
-      setErrorMessage("모든 필수 항목을 입력해 주세요.");
-      return;
+
+    if (!trimmedUsername) errors.username = "아이디는 필수입니다.";
+    else if (trimmedUsername.length < 5 || trimmedUsername.length > 20) {
+      errors.username = "아이디는 5-20자여야 합니다.";
     }
+
+    if (!trimmedNickname) errors.nickname = "닉네임은 필수입니다.";
+    else if (trimmedNickname.length < 2 || trimmedNickname.length > 30) {
+      errors.nickname = "닉네임은 2자 이상 30자 이하로 입력해 주세요.";
+    }
+
+    if (!password) {
+      errors.password = "비밀번호는 필수입니다.";
+    } else {
+      if (password.length < 8 || password.length > 20) {
+        errors.password = "비밀번호는 8-20자여야 합니다.";
+      }
+      // 복잡성 체크: 영문 대문자, 소문자, 숫자, 특수문자 중 3종류 이상
+      let complexity = 0;
+      if (/[a-z]/.test(password)) complexity++;
+      if (/[A-Z]/.test(password)) complexity++;
+      if (/[0-9]/.test(password)) complexity++;
+      if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(password)) complexity++;
+
+      if (complexity < 3) {
+        errors.password =
+          "비밀번호는 영문 대/소문자, 숫자, 특수문자 중 3가지 이상 조합이어야 합니다.";
+      }
+
+      // 연속된 문자/숫자 3개 이상 체크
+      const consecutiveNumbers = [
+        "012", "123", "234", "345", "456", "567", "678", "789", "890",
+      ];
+      if (consecutiveNumbers.some((seq) => password.includes(seq))) {
+        errors.password = "연속된 문자 또는 숫자 3개 이상 사용할 수 없습니다.";
+      }
+      // 동일 문자 3번 이상 반복 체크
+      if (/(.)\1\1/.test(password)) {
+        errors.password = "동일한 문자를 3번 이상 연속 사용할 수 없습니다.";
+      }
+
+      if (trimmedUsername && password.toLowerCase().includes(trimmedUsername.toLowerCase())) {
+        errors.password = "비밀번호에 아이디를 포함할 수 없습니다.";
+      }
+    }
+
+    setFieldErrors(Object.keys(errors).length ? errors : null);
+    return Object.keys(errors).length === 0;
+  };
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!validate()) return;
+
     setIsLoading(true);
     setErrorMessage(null);
+    setFieldErrors(null);
     try {
       const { rsData, errorMessage: apiError, response } =
         await apiRequest<unknown>("/api/v1/members", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            username: trimmedUsername,
+            username: username.trim(),
             password,
-            nickname: trimmedNickname,
+            nickname: nickname.trim(),
           }),
         });
       if (!response.ok || apiError || !rsData) {
-        setErrorMessage(apiError || "회원가입에 실패했습니다.");
+        if (rsData?.resultCode === "400-1" && rsData.msg) {
+          setErrorMessage(rsData.msg);
+        } else {
+          setErrorMessage(apiError || "회원가입에 실패했습니다.");
+        }
         return;
       }
       alert(rsData.msg || "회원가입이 완료되었습니다.");
@@ -53,7 +110,9 @@ export default function SignupPage() {
   const handleKakaoSignup = () => {
     setIsKakaoLoading(true);
     setErrorMessage(null);
-    window.location.href = buildApiUrl("/oauth2/authorization/kakao?redirectUrl=http://localhost:3000/");
+    window.location.href = buildApiUrl(
+      "/oauth2/authorization/kakao?redirectUrl=http://localhost:3000/"
+    );
   };
 
   return (
@@ -70,9 +129,12 @@ export default function SignupPage() {
             className="input"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
-            placeholder="username"
+            placeholder="아이디 (5-20자)"
             autoComplete="username"
           />
+          {fieldErrors?.username && (
+            <span className="error">{fieldErrors.username}</span>
+          )}
         </div>
         <div className="field" style={{ marginTop: 16 }}>
           <label className="label" htmlFor="nickname">
@@ -83,9 +145,12 @@ export default function SignupPage() {
             className="input"
             value={nickname}
             onChange={(event) => setNickname(event.target.value)}
-            placeholder="nickname"
+            placeholder="닉네임 (2-30자)"
             autoComplete="nickname"
           />
+          {fieldErrors?.nickname && (
+            <span className="error">{fieldErrors.nickname}</span>
+          )}
         </div>
         <div className="field" style={{ marginTop: 16 }}>
           <label className="label" htmlFor="password">
@@ -97,9 +162,12 @@ export default function SignupPage() {
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="password"
+            placeholder="8-20자, 영문 대/소문자, 숫자, 특수문자 중 3종 이상"
             autoComplete="new-password"
           />
+          {fieldErrors?.password && (
+            <span className="error">{fieldErrors.password}</span>
+          )}
         </div>
         {errorMessage ? (
           <ErrorMessage message={errorMessage} style={{ marginTop: 12 }} />
