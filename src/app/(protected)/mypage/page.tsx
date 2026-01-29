@@ -467,7 +467,7 @@ export default function MyPage() {
         <Card>
           <h2 style={{ marginTop: 0 }}>신뢰도</h2>
           <div style={{ fontSize: 32, fontWeight: 700 }}>
-            {me.score === null ? "-" : me.score}
+            {me.score === null ? "-" : me.score.toFixed(1)}
           </div>
         </Card>
         <Card>
