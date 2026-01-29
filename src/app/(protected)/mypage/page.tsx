@@ -621,11 +621,19 @@ export default function MyPage() {
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
               {posts.map((post) => (
-                <button
+                <div
                   key={post.id}
                   className="card"
-                  style={{ textAlign: "left" }}
+                  style={{ textAlign: "left", cursor: "pointer" }}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => router.push(`/posts/${post.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(`/posts/${post.id}`);
+                    }
+                  }}
                 >
                   <div className="muted">
                     {post.statusDisplayName || post.status}
@@ -652,7 +660,7 @@ export default function MyPage() {
                       {post.status === "SOLD" ? "판매 완료" : "판매 완료 처리"}
                     </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -722,11 +730,19 @@ export default function MyPage() {
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
               {auctions.map((auction) => (
-                <button
+                <div
                   key={auction.auctionId}
                   className="card"
-                  style={{ textAlign: "left" }}
+                  style={{ textAlign: "left", cursor: "pointer" }}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => router.push(`/auctions/${auction.auctionId}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(`/auctions/${auction.auctionId}`);
+                    }
+                  }}
                 >
                   <div className="muted">{auction.status}</div>
                   <div style={{ marginTop: 6 }}>{auction.name}</div>
@@ -737,7 +753,7 @@ export default function MyPage() {
                     )}
                     원 · 입찰 {auction.bidCount}건
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}

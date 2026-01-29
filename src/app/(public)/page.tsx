@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, buildApiUrl } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
@@ -22,6 +22,8 @@ type AuctionPreview = {
   auctionId: number;
   name: string;
   currentHighestBid: number | null;
+  startPrice?: number | null;
+  categoryName?: string;
   endAt: string;
   status: string;
   thumbnailUrl?: string;
@@ -30,6 +32,12 @@ type AuctionPreview = {
 const formatNumber = (value: number | null | undefined) => {
   if (value === null || value === undefined) return "-";
   return value.toLocaleString();
+};
+
+const resolveImageUrl = (url?: string | null) => {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return buildApiUrl(url);
 };
 
 export default function MainPage() {
@@ -87,18 +95,16 @@ export default function MainPage() {
   return (
     <div className="page">
       <section className="panel">
-        <h1 style={{ marginTop: 0 }}>오늘의 거래와 경매를 탐색해보세요</h1>
-        <p className="muted">
-          중고거래, 경매 핵심 경로를 빠르게 연결합니다.
-        </p>
+        <h1 style={{ marginTop: 0 }}>오늘의 거래와 경매를 한눈에</h1>
+        <p className="muted">중고거래와 경매를 빠르게 살펴보세요.</p>
         <div className="grid-2" style={{ marginTop: 20 }}>
           <Link className="card" href="/posts">
-            <h3 style={{ marginTop: 0 }}>중고거래 둘러보기</h3>
-            <p className="muted">최신 등록 상품과 카테고리를 살펴보세요.</p>
+            <h3 style={{ marginTop: 0 }}>중고거래 보기</h3>
+            <p className="muted">최신 등록 상품을 바로 확인하세요.</p>
           </Link>
           <Link className="card" href="/auctions">
-            <h3 style={{ marginTop: 0 }}>경매 시작하기</h3>
-            <p className="muted">진행 중인 경매와 종료 임박 상품을 확인합니다.</p>
+            <h3 style={{ marginTop: 0 }}>경매 둘러보기</h3>
+            <p className="muted">지금 진행 중인 경매를 모았습니다.</p>
           </Link>
         </div>
       </section>
@@ -118,6 +124,37 @@ export default function MainPage() {
               <div className="grid-3">
                 {recentPosts.slice(0, 3).map((post) => (
                   <Link key={post.id} className="panel" href={`/posts/${post.id}`}>
+                    <div
+                      style={{
+                        width: "100%",
+                        aspectRatio: "1 / 1",
+                        marginBottom: 12,
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        background: "var(--surface)",
+                        border: "1px solid var(--border)",
+                        display: "grid",
+                        placeItems: "center",
+                        color: "var(--muted)",
+                        fontSize: 12,
+                      }}
+                    >
+                      {resolveImageUrl(post.thumbnailUrl) ? (
+                        <img
+                          src={resolveImageUrl(post.thumbnailUrl) ?? ""}
+                          alt={`${post.title} 썸네일`}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            objectPosition: "50% 50%",
+                            display: "block",
+                          }}
+                        />
+                      ) : (
+                        "썸네일 없음"
+                      )}
+                    </div>
                     <div className="tag">{post.categoryName}</div>
                     <h4 style={{ margin: "12px 0 6px" }}>{post.title}</h4>
                     <div className="muted">{formatNumber(post.price)}원</div>
@@ -143,12 +180,47 @@ export default function MainPage() {
                     className="panel"
                     href={`/auctions/${auction.auctionId}`}
                   >
+                    <div
+                      style={{
+                        width: "100%",
+                        aspectRatio: "1 / 1",
+                        marginBottom: 12,
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        background: "var(--surface)",
+                        border: "1px solid var(--border)",
+                        display: "grid",
+                        placeItems: "center",
+                        color: "var(--muted)",
+                        fontSize: 12,
+                      }}
+                    >
+                      {resolveImageUrl(auction.thumbnailUrl) ? (
+                        <img
+                          src={resolveImageUrl(auction.thumbnailUrl) ?? ""}
+                          alt={`${auction.name} 썸네일`}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            objectPosition: "50% 50%",
+                            display: "block",
+                          }}
+                        />
+                      ) : (
+                        "썸네일 없음"
+                      )}
+                    </div>
                     <div className="tag">
-                      {getAuctionStatusLabel(auction.status)}
+                      {auction.categoryName || "경매"}
                     </div>
                     <h4 style={{ margin: "12px 0 6px" }}>{auction.name}</h4>
                     <div className="muted">
-                      현재 최고가 {formatNumber(auction.currentHighestBid)}원
+                      현재 최고가{" "}
+                      {formatNumber(
+                        auction.currentHighestBid ?? auction.startPrice
+                      )}
+                      원
                     </div>
                   </Link>
                 ))}
