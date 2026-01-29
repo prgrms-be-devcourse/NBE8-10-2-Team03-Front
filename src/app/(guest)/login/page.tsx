@@ -78,7 +78,7 @@ export default function LoginPage() {
   const handleKakaoLogin = () => {
     setIsKakaoLoading(true);
     setErrorMessage(null);
-    window.location.href = buildApiUrl("/oauth2/authorization/kakao");
+    window.location.href = buildApiUrl("/oauth2/authorization/kakao?redirectUrl=http://localhost:3000/");
   };
 
   return (

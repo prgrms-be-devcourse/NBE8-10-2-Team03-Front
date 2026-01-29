@@ -53,7 +53,7 @@ export default function SignupPage() {
   const handleKakaoSignup = () => {
     setIsKakaoLoading(true);
     setErrorMessage(null);
-    window.location.href = buildApiUrl("/oauth2/authorization/kakao");
+    window.location.href = buildApiUrl("/oauth2/authorization/kakao?redirectUrl=http://localhost:3000/");
   };
 
   return (
