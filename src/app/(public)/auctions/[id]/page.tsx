@@ -112,9 +112,6 @@ export default function AuctionDetailPage() {
   const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [wsToken, setWsToken] = useState<string | null>(null);
-  const [isWsTokenLoading, setIsWsTokenLoading] = useState(false);
-
   const auctionId = useMemo(() => {
     const raw = params?.id;
     const value = Array.isArray(raw) ? raw[0] : raw;
@@ -222,40 +219,12 @@ export default function AuctionDetailPage() {
     }
   }, [auction]);
 
-  // WebSocket 토큰 (HttpOnly 쿠키 대응) 가져오기
   useEffect(() => {
-    if (!auth?.me || wsToken) return;
-
-    let isMounted = true;
-    const fetchWsToken = async () => {
-      try {
-        setIsWsTokenLoading(true);
-        const { rsData } = await apiRequest<any>("/api/v1/members/ws-token");
-        if (isMounted && rsData?.data?.token) {
-          setWsToken(rsData.data.token);
-        }
-      } catch (e) {
-        console.error("Failed to fetch WebSocket token:", e);
-      } finally {
-        if (isMounted) setIsWsTokenLoading(false);
-      }
-    };
-
-    fetchWsToken();
-    return () => {
-      isMounted = false;
-    };
-  }, [auth?.me, wsToken]);
-
-  useEffect(() => {
-    if (!auctionId || !wsToken) return;
+    if (!auctionId) return;
     if (typeof window === "undefined") return;
 
     const client = new Client({
       webSocketFactory: () => new SockJS(buildApiUrl("/ws")),
-      connectHeaders: {
-        token: `Bearer ${wsToken}`,
-      },
       reconnectDelay: 5000,
       debug: (message) => {
         console.log("[stomp]", message);
@@ -330,7 +299,7 @@ export default function AuctionDetailPage() {
     return () => {
       client.deactivate();
     };
-  }, [auctionId, bidPageSize, loadAuctionDetail, wsToken]);
+  }, [auctionId, bidPageSize, loadAuctionDetail]);
 
   const handleBidSubmit = async () => {
     if (!auctionId || isBidSubmitting) return;

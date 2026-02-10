@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiRequest, buildApiUrl, getAuthHeaders, safeJson } from "@/lib/api";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -121,6 +121,7 @@ const isSameDay = (date1: string, date2: string) => {
 
 export default function ChatPage() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const auth = useAuth();
     const me = auth?.me;
     const myId = me?.id;
@@ -148,9 +149,15 @@ export default function ChatPage() {
     const lastChatIdRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const filterDropdownRef = useRef<HTMLDivElement | null>(null);
-
-    const [wsToken, setWsToken] = useState<string | null>(null);
-    const [isWsTokenLoading, setIsWsTokenLoading] = useState(false);
+    const stompClientRef = useRef<Client | null>(null);
+    const leftRoomIdsRef = useRef<Set<string>>(new Set());
+    const selectedRoomIdRef = useRef<string | null>(null);
+    const fetchRoomsRef = useRef<(showLoading?: boolean) => Promise<void>>(undefined);
+    const roomSubsRef = useRef<Map<string, { unsubscribe: () => void }>>(new Map());
+    const readSubRef = useRef<{ unsubscribe: () => void } | null>(null);
+    const roomsRef = useRef<RoomSummary[]>([]);
+    const handleRoomMessageRef = useRef<(roomId: string, data: any) => void>(() => {});
+    const [isStompConnected, setIsStompConnected] = useState(false);
 
     const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
     const [isExitModalOpen, setIsExitModalOpen] = useState(false);
@@ -180,12 +187,28 @@ export default function ChatPage() {
             }
 
             if (rsData?.resultCode?.startsWith("200")) {
-                alert("대화방에서 퇴장하였습니다.");
-                // 목록에서 제거 및 선택 해제
-                setRooms((prev) => prev.filter((r) => r.roomId !== selectedRoomId));
+                const leavingRoomId = selectedRoomId;
+                leftRoomIdsRef.current.add(leavingRoomId);
+
+                // 해당 방의 구독만 해제 (전체 STOMP 연결은 유지)
+                roomSubsRef.current.get(leavingRoomId)?.unsubscribe();
+                roomSubsRef.current.delete(leavingRoomId);
+                if (readSubRef.current) {
+                    readSubRef.current.unsubscribe();
+                    readSubRef.current = null;
+                }
+
+                // 상태 초기화 및 목록에서 제거
                 setSelectedRoomId(null);
+                setMessages([]);
+                setRooms((prev) => prev.filter((r) => r.roomId !== leavingRoomId));
                 setIsExitModalOpen(false);
                 setIsOptionsMenuOpen(false);
+
+                // URL 파라미터 정리 (pendingRoomId 제거)
+                router.replace("/chat");
+
+                alert("대화방에서 퇴장하였습니다.");
             }
         } catch (e) {
             console.error("Failed to leave room:", e);
@@ -231,9 +254,9 @@ export default function ChatPage() {
         [myId]
     );
 
-    // Auto-select room from URL
+    // Auto-select room from URL (퇴장한 방은 재선택 방지)
     useEffect(() => {
-        if (pendingRoomId && !selectedRoomId) {
+        if (pendingRoomId && !selectedRoomId && !leftRoomIdsRef.current.has(pendingRoomId)) {
             setSelectedRoomId(pendingRoomId);
         }
     }, [pendingRoomId, selectedRoomId]);
@@ -305,7 +328,7 @@ export default function ChatPage() {
                     const newPlaceholder: RoomSummary = {
                         roomId: pendingRoomId,
                         itemId: Number.isFinite(parsedItemId) ? parsedItemId : 0,
-                        lastMessage: "새 채팅방",
+                        lastMessage: "",
                         lastMessageAt: new Date().toISOString(), // 정렬을 위해 현재 시간 부여
                         unreadCount: 0,
                         opponentNickname: "불러오는 중...",
@@ -337,14 +360,342 @@ export default function ChatPage() {
         fetchRooms();
     }, [fetchRooms]);
 
-    // 주기적으로 채팅방 목록 새로고침 (안 읽은 메시지 수 동기화)
+    // 주기적으로 채팅방 목록 새로고침 (WebSocket 끊김 시 안전망)
     useEffect(() => {
         const interval = setInterval(() => {
-            fetchRooms(false); // 로딩 표시 없이 백그라운드 갱신
-        }, 30000); // 30초마다 갱신
+            fetchRooms(false);
+        }, 30000);
 
         return () => clearInterval(interval);
     }, [fetchRooms]);
+
+    // Ref를 항상 최신 값으로 유지 (STOMP 콜백에서 stale closure 방지)
+    selectedRoomIdRef.current = selectedRoomId;
+    fetchRoomsRef.current = fetchRooms;
+    roomsRef.current = rooms;
+
+    // 통합 메시지 핸들러 (모든 방의 메시지를 처리)
+    handleRoomMessageRef.current = (roomId: string, data: any) => {
+        const currentSelected = selectedRoomIdRef.current;
+        const isSelectedRoom = roomId === currentSelected;
+
+        const normalized: ChatDto = {
+            ...data,
+            id: data.id ?? undefined,
+            roomId: data.roomId ?? roomId,
+        };
+
+        // 현재 선택된 방: 채팅 메시지 추가
+        if (isSelectedRoom) {
+            setMessages((prev) => {
+                if (normalized.id && prev.some((msg) => msg.id === normalized.id)) return prev;
+
+                // 상대방 메시지 수신 시 읽음 처리 트리거
+                if (normalized.senderId !== myId) {
+                    apiRequest(`/api/v1/chat/room/${roomId}`);
+                }
+
+                return [...prev, normalized];
+            });
+        }
+
+        // 모든 방: 목록 업데이트 (lastMessage, unreadCount)
+        setRooms((prev) => {
+            if (prev.length === 0) return prev;
+            const next = prev.map((room) => {
+                if (room.roomId !== roomId) return room;
+                return {
+                    ...room,
+                    lastMessage: normalized.message || "[사진]",
+                    lastMessageAt: normalized.createDate,
+                    unreadCount: isSelectedRoom ? 0 : (room.unreadCount ?? 0) + 1,
+                };
+            });
+            return [...next].sort(
+                (a, b) => toTimestamp(b.lastMessageAt) - toTimestamp(a.lastMessageAt)
+            );
+        });
+    };
+
+    // 통합 STOMP 클라이언트: 모든 채팅방의 메시지 구독
+    useEffect(() => {
+        if (typeof window === "undefined" || !myId) return;
+
+        let isActive = true;
+
+        const client = new Client({
+            webSocketFactory: () => new SockJS(buildApiUrl("/ws")),
+            reconnectDelay: 5000,
+            heartbeatIncoming: 10000,
+            heartbeatOutgoing: 10000,
+            debug: (str) => {
+                if (str.includes("ERROR") || str.includes("Close")) {
+                    console.log("[STOMP]", str);
+                }
+            },
+            onConnect: () => {
+                if (!isActive) return;
+                console.log("[STOMP] Connected. Subscribing to all rooms...");
+
+                // 기존 구독 정리
+                roomSubsRef.current.forEach((sub) => sub.unsubscribe());
+                roomSubsRef.current.clear();
+
+                // 현재 모든 채팅방에 구독
+                const currentRooms = roomsRef.current;
+                for (const room of currentRooms) {
+                    const sub = client.subscribe(
+                        `/sub/v1/chat/room/${room.roomId}`,
+                        (message) => {
+                            if (!message.body || !isActive) return;
+                            try {
+                                const parsed = JSON.parse(message.body);
+                                const data = parsed.data ?? parsed;
+                                if (!data) return;
+                                handleRoomMessageRef.current(room.roomId, data);
+                            } catch (e) {
+                                console.error("[STOMP] Message parse error:", e);
+                            }
+                        }
+                    );
+                    roomSubsRef.current.set(room.roomId, sub);
+                }
+
+                // 개인 알림 구독: 새 채팅방 생성 + 새 메시지 알림
+                console.log(`[STOMP] Subscribing to: /sub/user/${myId}/notification`);
+                client.subscribe(`/sub/user/${myId}/notification`, (message) => {
+                    if (!message.body || !isActive) return;
+                    console.log("[STOMP] Notification received:", message.body);
+                    try {
+                        const noti = JSON.parse(message.body);
+                        const data = noti.data ?? noti;
+                        if (!data?.roomId) {
+                            console.warn("[STOMP] Notification missing roomId:", data);
+                            return;
+                        }
+
+                        if (data.type === "NEW_ROOM") {
+                            console.log("[STOMP] NEW_ROOM notification:", data.roomId);
+                            // 새 채팅방: 목록에 추가
+                            setRooms((prev) => {
+                                if (prev.some((r) => r.roomId === data.roomId)) return prev;
+                                const newRoom: RoomSummary = {
+                                    roomId: data.roomId,
+                                    itemId: data.itemId,
+                                    opponentId: data.opponentId,
+                                    opponentNickname: data.opponentNickname || "알 수 없음",
+                                    opponentProfileImageUrl: data.opponentProfileImageUrl,
+                                    lastMessage: data.lastMessage,
+                                    lastMessageAt: data.lastMessageDate,
+                                    unreadCount: data.unreadCount ?? 1,
+                                    itemName: data.itemName,
+                                    itemImageUrl: data.itemImageUrl,
+                                    itemPrice: data.itemPrice,
+                                    txType: data.txType,
+                                };
+                                return [newRoom, ...prev].sort(
+                                    (a, b) => toTimestamp(b.lastMessageAt) - toTimestamp(a.lastMessageAt)
+                                );
+                            });
+
+                            // 새 방의 메시지 토픽도 즉시 구독
+                            if (!roomSubsRef.current.has(data.roomId)) {
+                                const sub = client.subscribe(
+                                    `/sub/v1/chat/room/${data.roomId}`,
+                                    (msg) => {
+                                        if (!msg.body || !isActive) return;
+                                        try {
+                                            const parsed = JSON.parse(msg.body);
+                                            const msgData = parsed.data ?? parsed;
+                                            if (!msgData) return;
+                                            handleRoomMessageRef.current(data.roomId, msgData);
+                                        } catch (e) {
+                                            console.error("[STOMP] Message parse error:", e);
+                                        }
+                                    }
+                                );
+                                roomSubsRef.current.set(data.roomId, sub);
+                                console.log(`[STOMP] Subscribed to new room: ${data.roomId}`);
+                            }
+                        } else if (data.type === "NEW_MESSAGE") {
+                            // 새 메시지: 목록에 없으면 새 방으로 추가, 있으면 갱신
+                            const currentSelected = selectedRoomIdRef.current;
+                            setRooms((prev) => {
+                                const exists = prev.some((r) => r.roomId === data.roomId);
+
+                                if (!exists) {
+                                    // 목록에 없는 방 → 새 채팅방으로 추가
+                                    const newRoom: RoomSummary = {
+                                        roomId: data.roomId,
+                                        itemId: data.itemId,
+                                        opponentId: data.opponentId,
+                                        opponentNickname: data.opponentNickname || "알 수 없음",
+                                        opponentProfileImageUrl: data.opponentProfileImageUrl,
+                                        lastMessage: data.lastMessage,
+                                        lastMessageAt: data.lastMessageDate,
+                                        unreadCount: data.unreadCount ?? 1,
+                                        itemName: data.itemName,
+                                        itemImageUrl: data.itemImageUrl,
+                                        itemPrice: data.itemPrice,
+                                        txType: data.txType,
+                                    };
+                                    return [newRoom, ...prev].sort(
+                                        (a, b) => toTimestamp(b.lastMessageAt) - toTimestamp(a.lastMessageAt)
+                                    );
+                                }
+
+                                const next = prev.map((room) => {
+                                    if (room.roomId !== data.roomId) return room;
+                                    return {
+                                        ...room,
+                                        lastMessage: data.lastMessage ?? room.lastMessage,
+                                        lastMessageAt: data.lastMessageDate ?? room.lastMessageAt,
+                                        unreadCount: data.roomId === currentSelected
+                                            ? 0
+                                            : (data.unreadCount ?? (room.unreadCount ?? 0) + 1),
+                                    };
+                                });
+                                return [...next].sort(
+                                    (a, b) => toTimestamp(b.lastMessageAt) - toTimestamp(a.lastMessageAt)
+                                );
+                            });
+
+                            // 새 방이면 메시지 토픽도 구독
+                            if (!roomSubsRef.current.has(data.roomId)) {
+                                const sub = client.subscribe(
+                                    `/sub/v1/chat/room/${data.roomId}`,
+                                    (msg) => {
+                                        if (!msg.body || !isActive) return;
+                                        try {
+                                            const parsed = JSON.parse(msg.body);
+                                            const msgData = parsed.data ?? parsed;
+                                            if (!msgData) return;
+                                            handleRoomMessageRef.current(data.roomId, msgData);
+                                        } catch (e) {
+                                            console.error("[STOMP] Message parse error:", e);
+                                        }
+                                    }
+                                );
+                                roomSubsRef.current.set(data.roomId, sub);
+                                console.log(`[STOMP] Subscribed to new room via NEW_MESSAGE: ${data.roomId}`);
+                            }
+                        }
+                    } catch (e) {
+                        console.error("[STOMP] Notification parse error:", e);
+                    }
+                });
+
+                setIsStompConnected(true);
+                console.log(`[STOMP] Subscribed to ${currentRooms.length} rooms + personal notification.`);
+            },
+            onStompError: (frame) => {
+                console.error("[STOMP ERROR]", frame.headers["message"], frame.body);
+            },
+            onWebSocketClose: () => {
+                if (isActive) {
+                    console.log("[STOMP] WebSocket closed.");
+                    setIsStompConnected(false);
+                }
+            },
+        });
+
+        stompClientRef.current = client;
+        client.activate();
+
+        return () => {
+            isActive = false;
+            setIsStompConnected(false);
+            roomSubsRef.current.forEach((sub) => sub.unsubscribe());
+            roomSubsRef.current.clear();
+            if (readSubRef.current) {
+                readSubRef.current.unsubscribe();
+                readSubRef.current = null;
+            }
+            client.deactivate();
+            stompClientRef.current = null;
+        };
+    }, [myId]);
+
+    // 새로 추가된 채팅방 구독 (STOMP 연결 중 rooms 변경 시)
+    useEffect(() => {
+        if (!isStompConnected || !stompClientRef.current) return;
+
+        const client = stompClientRef.current;
+        const currentRoomIds = new Set(rooms.map((r) => r.roomId));
+        const subscribedRoomIds = new Set(roomSubsRef.current.keys());
+
+        // 새 방 구독
+        for (const room of rooms) {
+            if (!subscribedRoomIds.has(room.roomId)) {
+                const sub = client.subscribe(
+                    `/sub/v1/chat/room/${room.roomId}`,
+                    (message) => {
+                        if (!message.body) return;
+                        try {
+                            const parsed = JSON.parse(message.body);
+                            const data = parsed.data ?? parsed;
+                            if (!data) return;
+                            handleRoomMessageRef.current(room.roomId, data);
+                        } catch (e) {
+                            console.error("[STOMP] Message parse error:", e);
+                        }
+                    }
+                );
+                roomSubsRef.current.set(room.roomId, sub);
+                console.log(`[STOMP] Subscribed to new room: ${room.roomId}`);
+            }
+        }
+
+        // 삭제된 방 구독 해제
+        for (const roomId of subscribedRoomIds) {
+            if (!currentRoomIds.has(roomId)) {
+                roomSubsRef.current.get(roomId)?.unsubscribe();
+                roomSubsRef.current.delete(roomId);
+                console.log(`[STOMP] Unsubscribed from removed room: ${roomId}`);
+            }
+        }
+    }, [rooms, isStompConnected]);
+
+    // 선택된 방의 /read 구독 관리
+    useEffect(() => {
+        // 기존 read 구독 해제
+        if (readSubRef.current) {
+            readSubRef.current.unsubscribe();
+            readSubRef.current = null;
+        }
+
+        if (!isStompConnected || !stompClientRef.current || !selectedRoomId) return;
+
+        const client = stompClientRef.current;
+
+        // 새 read 구독
+        readSubRef.current = client.subscribe(
+            `/sub/v1/chat/room/${selectedRoomId}/read`,
+            (message) => {
+                if (!message.body) return;
+                try {
+                    const parsed = JSON.parse(message.body);
+                    const readerId = parsed.readerId ?? parsed.data?.readerId;
+                    if (readerId && readerId !== myId) {
+                        setMessages((prev) =>
+                            prev.map((msg) =>
+                                msg.senderId === myId ? { ...msg, read: true } : msg
+                            )
+                        );
+                    }
+                } catch (e) {
+                    console.error("[STOMP] Read status parse error:", e);
+                }
+            }
+        );
+
+        return () => {
+            if (readSubRef.current) {
+                readSubRef.current.unsubscribe();
+                readSubRef.current = null;
+            }
+        };
+    }, [selectedRoomId, isStompConnected, myId]);
 
     // "불러오는 중..."인 새 채팅방의 상세 정보(상품명, 가격, 상대방) 가져오기
     useEffect(() => {
@@ -437,6 +788,14 @@ export default function ChatPage() {
                     `/api/v1/chat/room/${selectedRoomId}`
                 );
                 if (!response.ok || !rsData) {
+                    // 방이 삭제된 경우: 선택 해제 및 목록에서 제거
+                    if (response.status === 404) {
+                        if (isMounted) {
+                            setRooms((prev) => prev.filter((r) => r.roomId !== selectedRoomId));
+                            setSelectedRoomId(null);
+                        }
+                        return;
+                    }
                     setMessagesError(errorMessage || "메시지를 불러오지 못했습니다.");
                     return;
                 }
@@ -473,160 +832,6 @@ export default function ChatPage() {
         if (!selectedRoomId || !messagesEndRef.current) return;
         messagesEndRef.current.scrollIntoView({ behavior: "auto" });
     }, [messages, selectedRoomId]);
-
-    // WebSocket 토큰 (HttpOnly 쿠키 우회용) 가져오기
-    useEffect(() => {
-        // ✅ me (유저 정보)는 있어야 하지만, apiKey가 필수는 아님 (HttpOnly 쿠키 사용)
-        if (!me || wsToken) return;
-
-        let isMounted = true;
-        const fetchWsToken = async () => {
-            try {
-                console.log("[DEBUG] WebSocket Token Fetch Started (Session based)");
-                setIsWsTokenLoading(true);
-                const { rsData } = await apiRequest<any>("/api/v1/members/ws-token");
-                if (isMounted && rsData?.data?.token) {
-                    console.log("[DEBUG] WebSocket token fetched successfully");
-                    setWsToken(rsData.data.token);
-                }
-            } catch (e) {
-                console.error("[DEBUG] Failed to fetch WebSocket token:", e);
-            } finally {
-                if (isMounted) setIsWsTokenLoading(false);
-            }
-        };
-
-        fetchWsToken();
-        return () => { isMounted = false; };
-    }, [me, wsToken]);
-
-    // WebSocket connection
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-
-        // ✅ roomId and wsToken are enough for HttpOnly cookie flow
-        if (!selectedRoomId || !wsToken || !me) {
-            return;
-        }
-
-        console.log("[DEBUG] WebSocket Connection Attempt:", {
-            userId: me.id,
-            roomId: selectedRoomId,
-            hasWsToken: !!wsToken
-        });
-
-        let isActive = true;
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 3;
-
-        const client = new Client({
-            webSocketFactory: () => new SockJS(buildApiUrl("/ws")),
-            connectHeaders: { token: `Bearer ${wsToken}` },
-            reconnectDelay: 5000,
-            heartbeatIncoming: 10000,
-            heartbeatOutgoing: 10000,
-            debug: (str) => {
-                if (str.includes("STOMP") || str.includes("ERROR") || str.includes("Close") || str.includes("SUBSCRIBE")) {
-                    console.log("[STOMP]", str);
-                }
-            },
-            onConnect: (frame) => {
-                if (!isActive) return;
-                reconnectAttempts = 0;
-                console.log("[STOMP] CONNECTED. User:", me.username, "Room:", selectedRoomId);
-
-                // 메시지 구독
-                console.log(`[STOMP] Subscribing to: /sub/v1/chat/room/${selectedRoomId}`);
-                client.subscribe(`/sub/v1/chat/room/${selectedRoomId}`, (message) => {
-                    if (!message.body || !isActive) return;
-                    try {
-                        console.log("[STOMP] Message received in room:", selectedRoomId);
-                        const parsed = JSON.parse(message.body);
-                        const data = parsed.data ?? parsed;
-                        if (!data || (data.roomId && data.roomId !== selectedRoomId)) return;
-
-                        const normalized: ChatDto = {
-                            ...data,
-                            id: data.id ?? undefined,
-                            roomId: data.roomId ?? selectedRoomId,
-                        };
-
-                        setMessages((prev) => {
-                            if (normalized.id && prev.some((msg) => msg.id === normalized.id))
-                                return prev;
-                            const next = [...prev, normalized];
-
-                            if (normalized.senderId !== myId) {
-                                console.log("[DEBUG] Opponent message received, triggering read sync...");
-                                apiRequest(`/api/v1/chat/room/${selectedRoomId}`);
-                            }
-
-                            return next;
-                        });
-
-                        setRooms((prev) => {
-                            if (prev.length === 0) return prev;
-                            const next = prev.map((room) =>
-                                room.roomId === selectedRoomId
-                                    ? {
-                                        ...room,
-                                        lastMessage: normalized.message || "사진",
-                                        lastMessageAt: normalized.createDate,
-                                        unreadCount: 0,
-                                    }
-                                    : room
-                            );
-                            return [...next].sort(
-                                (a, b) =>
-                                    toTimestamp(b.lastMessageAt) - toTimestamp(a.lastMessageAt)
-                            );
-                        });
-                    } catch (e) {
-                        console.error("메시지 파싱 오류:", e);
-                    }
-                });
-
-                // 읽음 상태 구독
-                client.subscribe(
-                    `/sub/v1/chat/room/${selectedRoomId}/read`,
-                    (message) => {
-                        if (!message.body || !isActive) return;
-                        try {
-                            const parsed = JSON.parse(message.body);
-                            const readerId = parsed.readerId ?? parsed.data?.readerId;
-                            if (readerId && readerId !== myId) {
-                                setMessages((prev) =>
-                                    prev.map((msg) =>
-                                        msg.senderId === myId ? { ...msg, read: true } : msg
-                                    )
-                                );
-                            }
-                        } catch (e) {
-                            console.error("읽음 상태 파싱 오류:", e);
-                        }
-                    }
-                );
-            },
-            onStompError: (frame) => {
-                const errorMsg = frame.headers["message"] || "Unknown STOMP error";
-                console.error("[STOMP ERROR]", errorMsg, frame.body);
-
-                if (reconnectAttempts < maxReconnectAttempts) {
-                    reconnectAttempts++;
-                    console.log(`[STOMP] Connection retry attempt ${reconnectAttempts}/${maxReconnectAttempts}...`);
-                }
-            },
-            onWebSocketClose: () => {
-                if (isActive) console.log("[STOMP] WebSocket connection closed.");
-            },
-        });
-
-        client.activate();
-        return () => {
-            isActive = false;
-            client.deactivate();
-        };
-    }, [selectedRoomId, wsToken, me, myId]);
 
     // Send message
     const handleSend = async (filesOverride?: File[]) => {
@@ -697,7 +902,7 @@ export default function ChatPage() {
                     room.roomId === selectedRoomId
                         ? {
                             ...room,
-                            lastMessage: optimisticMessage.message || "사진",
+                            lastMessage: optimisticMessage.message || "[사진]",
                             lastMessageAt: nowIso,
                             unreadCount: 0,
                         }
@@ -843,12 +1048,20 @@ export default function ChatPage() {
                                         <span className="chat-room-name">{room.opponentNickname || "알 수 없음"}</span>
                                     </div>
                                     <div className="chat-room-preview-row">
-                                        <span className="chat-room-preview-text">
-                                            {room.lastMessage || "사진"}
-                                        </span>
-                                        <span className="chat-room-date">
-                                            · {formatRelativeTime(room.lastMessageAt)}
-                                        </span>
+                                        {room.lastMessage ? (
+                                            <span className="chat-room-preview-text">
+                                                {room.lastMessage}
+                                            </span>
+                                        ) : (
+                                            <span className="chat-room-preview-text" style={{ color: "var(--text-tertiary, #9ca3af)" }}>
+                                                채팅방이 개설되었습니다.
+                                            </span>
+                                        )}
+                                        {room.lastMessage && (
+                                            <span className="chat-room-date">
+                                                · {formatRelativeTime(room.lastMessageAt)}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="chat-room-right">
@@ -1017,7 +1230,7 @@ export default function ChatPage() {
                             {isMessagesLoading ? (
                                 <div className="chat-loading">불러오는 중...</div>
                             ) : messages.length === 0 ? (
-                                <div className="chat-loading">메시지가 없습니다.</div>
+                                <div className="chat-loading" style={{ color: "var(--text-tertiary, #9ca3af)" }}>첫 메시지를 보내보세요!</div>
                             ) : (
                                 messages.map((message, index) => {
                                     const isMine = message.senderId === myId;

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AuthProvider, type MemberMe } from "@/components/auth/AuthContext";
+import { resolveImageUrl } from "@/lib/api";
 
 export default function PublicShell({
   me,
@@ -30,8 +31,27 @@ export default function PublicShell({
                 <div className="skeleton" style={{ width: 120 }} />
               ) : me ? (
                 <>
-                  <Link className="btn btn-ghost" href="/mypage">
-                    마이페이지
+                  <Link href="/mypage" style={{ display: "flex", alignItems: "center", gap: "6px", textDecoration: "none", color: "inherit" }}>
+                    <div
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        backgroundColor: "var(--bg-strong)",
+                        overflow: "hidden",
+                        border: "1px solid var(--border)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <img
+                        src={resolveImageUrl(me.profileImgUrl)}
+                        alt="프로필"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 600 }}>
+                      {me.name || me.username || "마이페이지"}
+                    </span>
                   </Link>
                   <Link className="btn btn-primary" href="/chat">
                     채팅

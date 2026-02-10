@@ -373,18 +373,10 @@ export default function MyPage() {
         setGlobalMe({ ...me, profileImgUrl: blobUrl });
       }
 
-      // Re-fetch 'me' info to update the UI
-      const currentProfileImgUrl = me?.profileImgUrl;
+      // Re-fetch 'me' info to get the server-side profileImgUrl
       const { rsData: meRsData, response: meResponse } = await apiRequest<MemberMe>("/api/v1/members/me");
       if (meResponse.ok && meRsData?.data) {
-        // NOTE: Backend DTO (MemberWithUsernameDto) might be missing profileImgUrl.
-        // We ensure we keep the current URL (could be a blob URL or previous server URL)
-        // if the re-fetch doesn't provide it.
-        const updatedMe = {
-          ...meRsData.data,
-          profileImgUrl: meRsData.data.profileImgUrl || currentProfileImgUrl
-        };
-        setGlobalMe(updatedMe);
+        setGlobalMe(meRsData.data);
       }
 
       setProfileImgSuccess(rsData.msg || "프로필 이미지가 수정되었습니다.");
