@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { apiRequest, buildApiUrl } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { NumberPagination } from "@/components/ui/NumberPagination";
 import { getAuctionStatusLabel } from "@/lib/status";
 import { CATEGORIES } from "@/lib/categories";
 import { formatDateTime } from "@/lib/datetime";
@@ -73,31 +74,51 @@ const resolveImageUrl = (url?: string | null) => {
   return buildApiUrl(url);
 };
 
+const getAuctionStatusClassName = (status: string) => {
+  switch (status) {
+    case "OPEN":
+      return "tag-status-open";
+    case "COMPLETED":
+      return "tag-status-completed";
+    case "CLOSED":
+      return "tag-status-closed";
+    case "CANCELLED":
+      return "tag-status-cancelled";
+    default:
+      return "tag-status-open";
+  }
+};
+
 export default function AuctionsPage() {
   const router = useRouter();
   const auth = useAuth();
   const [keywordInput, setKeywordInput] = useState("");
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState("all");
-  const [categoryInput, setCategoryInput] = useState("");
   const [categoryName, setCategoryName] = useState<string | null>(null);
   const [sort, setSort] = useState("LATEST");
   const [page, setPage] = useState(0);
-  const [size, setSize] = useState(20);
+  const [size] = useState(12);
   const [auctions, setAuctions] = useState<AuctionItem[]>([]);
   const [pageData, setPageData] = useState<AuctionPageData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const buildQuery = () => {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setKeyword(keywordInput.trim());
+      setPage(0);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [keywordInput]);
+
+  const buildQuery = useCallback(() => {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("size", String(size));
     if (status && status !== "all") params.set("status", status);
     if (categoryName) {
       params.set("category", categoryName);
-    } else if (categoryInput.trim()) {
-      params.set("category", categoryInput.trim());
     }
     if (sort === "LATEST") {
       params.set("sort", "createDate,desc");
@@ -105,7 +126,7 @@ export default function AuctionsPage() {
       params.set("sort", "createDate,asc");
     }
     return params.toString();
-  };
+  }, [page, size, status, categoryName, sort]);
 
   useEffect(() => {
     let isMounted = true;
@@ -189,7 +210,24 @@ export default function AuctionsPage() {
     return () => {
       isMounted = false;
     };
-  }, [status, categoryName, categoryInput, sort, page, size, keyword]);
+  }, [status, categoryName, sort, page, size, keyword, buildQuery]);
+
+  const sortedAuctions = useMemo(() => {
+    const items = [...auctions];
+    items.sort((a, b) => {
+      if (sort === "PRICE_ASC") {
+        return (a.currentHighestBid ?? a.startPrice ?? 0) - (b.currentHighestBid ?? b.startPrice ?? 0);
+      }
+      if (sort === "PRICE_DESC") {
+        return (b.currentHighestBid ?? b.startPrice ?? 0) - (a.currentHighestBid ?? a.startPrice ?? 0);
+      }
+      if (sort === "END_SOON") {
+        return new Date(a.endAt).getTime() - new Date(b.endAt).getTime();
+      }
+      return 0;
+    });
+    return items;
+  }, [auctions, sort]);
 
   const handleWrite = () => {
     if (auth?.me) {
@@ -199,30 +237,23 @@ export default function AuctionsPage() {
     router.push("/login");
   };
 
-  const applySearch = () => {
-    setKeyword(keywordInput.trim());
-    setPage(0);
-  };
-
   const resetFilters = () => {
     setKeywordInput("");
-    setKeyword("");
     setStatus("all");
-    setCategoryInput("");
     setCategoryName(null);
+    setSort("LATEST");
     setPage(0);
   };
 
   return (
     <div className="page">
-      <div style={{ display: "grid", gap: 24, gridTemplateColumns: "220px 1fr" }}>
-        <aside className="panel" style={{ alignSelf: "start" }}>
+      <div className="catalog-layout">
+        <aside className="panel catalog-sidebar">
           <h2 style={{ marginTop: 0 }}>카테고리</h2>
-          <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+          <div className="category-scroll">
             <button
-              className="card"
+              className="card category-chip"
               style={{
-                textAlign: "left",
                 border:
                   categoryName === null
                     ? "2px solid var(--accent)"
@@ -230,7 +261,6 @@ export default function AuctionsPage() {
               }}
               onClick={() => {
                 setCategoryName(null);
-                setCategoryInput("");
                 setPage(0);
               }}
             >
@@ -239,9 +269,8 @@ export default function AuctionsPage() {
             {CATEGORIES.map((item) => (
               <button
                 key={item.id}
-                className="card"
+                className="card category-chip"
                 style={{
-                  textAlign: "left",
                   border:
                     categoryName === item.name
                       ? "2px solid var(--accent)"
@@ -249,7 +278,6 @@ export default function AuctionsPage() {
                 }}
                 onClick={() => {
                   setCategoryName(item.name);
-                  setCategoryInput(item.name);
                   setPage(0);
                 }}
               >
@@ -261,7 +289,7 @@ export default function AuctionsPage() {
         <div>
           <section className="panel">
             <h1 style={{ marginTop: 0 }}>경매 목록</h1>
-            <div className="field-row" style={{ marginTop: 16 }}>
+            <div className="list-toolbar">
               <div className="field">
                 <label className="label" htmlFor="keyword">
                   검색어
@@ -271,10 +299,7 @@ export default function AuctionsPage() {
                   className="input"
                   value={keywordInput}
                   onChange={(event) => setKeywordInput(event.target.value)}
-                  placeholder="경매명/경매내용으로 검색"
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") applySearch();
-                  }}
+                  placeholder="경매 상품 검색"
                 />
               </div>
               <div className="field">
@@ -295,21 +320,6 @@ export default function AuctionsPage() {
                 </select>
               </div>
               <div className="field">
-                <label className="label" htmlFor="category">
-                  카테고리
-                </label>
-                <input
-                  id="category"
-                  className="input"
-                  value={categoryInput}
-                  onChange={(event) => {
-                    setCategoryInput(event.target.value);
-                    setCategoryName(null);
-                  }}
-                  placeholder="카테고리 입력"
-                />
-              </div>
-              <div className="field">
                 <label className="label" htmlFor="sort">
                   정렬
                 </label>
@@ -317,30 +327,20 @@ export default function AuctionsPage() {
                   id="sort"
                   className="select"
                   value={sort}
-                  onChange={(event) => setSort(event.target.value)}
+                  onChange={(event) => {
+                    setSort(event.target.value);
+                    setPage(0);
+                  }}
                 >
-                  <option value="LATEST">최신순</option>
-                  <option value="OLDEST">오래된순</option>
+                  <option value="LATEST">최신 등록순</option>
+                  <option value="OLDEST">오래된 등록순</option>
+                  <option value="PRICE_ASC">가격 낮은순</option>
+                  <option value="PRICE_DESC">가격 높은순</option>
+                  <option value="END_SOON">마감 임박순</option>
                 </select>
-              </div>
-              <div className="field">
-                <label className="label" htmlFor="size">
-                  페이지 크기
-                </label>
-                <input
-                  id="size"
-                  className="input"
-                  type="number"
-                  min={1}
-                  value={size}
-                  onChange={(event) => setSize(Number(event.target.value) || 20)}
-                />
               </div>
             </div>
             <div className="actions" style={{ marginTop: 16 }}>
-              <button className="btn btn-primary" onClick={applySearch}>
-                검색 적용
-              </button>
               <button className="btn btn-primary" onClick={handleWrite}>
                 경매 등록
               </button>
@@ -358,14 +358,14 @@ export default function AuctionsPage() {
               </Card>
             ) : errorMessage ? (
               <ErrorMessage message={errorMessage} />
-            ) : auctions.length === 0 ? (
+            ) : sortedAuctions.length === 0 ? (
               <EmptyState message="표시할 경매가 없습니다." />
             ) : (
               <div className="grid-3">
-                {auctions.map((auction) => (
+                {sortedAuctions.map((auction) => (
                   <Link
                     key={auction.auctionId}
-                    className="card"
+                    className="card market-card list-card"
                     href={`/auctions/${auction.auctionId}`}
                   >
                     <div
@@ -375,7 +375,7 @@ export default function AuctionsPage() {
                         marginBottom: 12,
                         borderRadius: 12,
                         overflow: "hidden",
-                        background: "var(--surface)",
+                        background: "var(--bg-surface)",
                         border: "1px solid var(--border)",
                         display: "grid",
                         placeItems: "center",
@@ -396,21 +396,25 @@ export default function AuctionsPage() {
                           }}
                         />
                       ) : (
-                        "썸네일 없음"
+                        <span className="thumb-empty">🔥 썸네일 준비 중</span>
                       )}
                     </div>
-                    <div className="tag">{auction.categoryName || "경매"}</div>
+                    <div className={`tag tag-status ${getAuctionStatusClassName(auction.status)}`}>
+                      {getAuctionStatusLabel(auction.status)}
+                    </div>
                     <h3 style={{ margin: "12px 0 6px" }}>{auction.name}</h3>
-                    <div className="muted">
-                      {formatNumber(
-                        auction.currentHighestBid ?? auction.startPrice
-                      )}
-                      원 · {getAuctionStatusLabel(auction.status)}
+                    <div className="list-price-row">
+                      <span className="list-price">
+                        {formatNumber(auction.currentHighestBid ?? auction.startPrice)}원
+                      </span>
                     </div>
-                    <div className="muted" style={{ marginTop: 4 }}>
-                      {formatDateTime(auction.endAt)}
+                    <div className="muted list-meta">
+                      {auction.categoryName || "경매"}
                     </div>
-                    <div className="muted" style={{ marginTop: 6 }}>
+                    <div className="muted list-meta">
+                      마감 {formatDateTime(auction.endAt)}
+                    </div>
+                    <div className="muted list-meta">
                       입찰 {formatNumber(auction.bidCount)}건 · 판매자{" "}
                       {auction.seller?.nickname || auction.sellerNickname || "-"}
                     </div>
@@ -424,30 +428,12 @@ export default function AuctionsPage() {
               </div>
             )}
             {pageData ? (
-              <div className="actions" style={{ marginTop: 16 }}>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
-                  disabled={page <= 0}
-                >
-                  이전
-                </button>
-                <span className="muted">
-                  {page + 1} / {pageData.totalPages} (총 {pageData.totalElements}건)
-                </span>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() =>
-                    setPage((prev) =>
-                      pageData.totalPages
-                        ? Math.min(prev + 1, pageData.totalPages - 1)
-                        : prev + 1
-                    )
-                  }
-                  disabled={pageData.totalPages > 0 && page >= pageData.totalPages - 1}
-                >
-                  다음
-                </button>
+              <div className="pager-wrap">
+                <NumberPagination
+                  page={page}
+                  totalPages={pageData.totalPages ?? 0}
+                  onChange={(nextPage) => setPage(nextPage)}
+                />
               </div>
             ) : null}
           </section>
@@ -456,7 +442,3 @@ export default function AuctionsPage() {
     </div>
   );
 }
-
-
-
-

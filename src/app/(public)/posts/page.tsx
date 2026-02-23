@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
+import { NumberPagination } from "@/components/ui/NumberPagination";
 import { getPostStatusLabel } from "@/lib/status";
 import { CATEGORIES } from "@/lib/categories";
 import { formatDateTime } from "@/lib/datetime";
@@ -78,27 +79,30 @@ export default function PostsPage() {
   const [sort, setSort] = useState("LATEST");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(0);
-  const [categoryInput, setCategoryInput] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(12);
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [totalPages, setTotalPages] = useState<number | null>(null);
-  const [totalElements, setTotalElements] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const categoryNameFilter = useMemo(() => {
-    if (categoryId !== null) {
-      return CATEGORIES.find((item) => item.id === categoryId)?.name ?? null;
-    }
-    const trimmed = categoryInput.trim();
-    return trimmed ? trimmed : null;
-  }, [categoryId, categoryInput]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setKeyword(keywordInput.trim());
+      setPage(0);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [keywordInput]);
 
   const visiblePosts = useMemo(() => {
-    if (!categoryNameFilter) return posts;
-    return posts.filter((post) => post.categoryName === categoryNameFilter);
-  }, [posts, categoryNameFilter]);
+    const items = [...posts];
+    if (sort === "PRICE_ASC") {
+      items.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+    } else if (sort === "PRICE_DESC") {
+      items.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+    }
+    return items;
+  }, [posts, sort]);
 
   useEffect(() => {
     let isMounted = true;
@@ -119,8 +123,6 @@ export default function PostsPage() {
         }
         if (categoryId !== null) {
           params.set("categoryId", String(categoryId));
-        } else if (categoryInput.trim()) {
-          params.set("category", categoryInput.trim());
         }
         const endpoint = keyword
           ? `/api/v1/search?keyword=${encodeURIComponent(keyword)}&${params.toString()}`
@@ -156,14 +158,10 @@ export default function PostsPage() {
             }))
           );
           setTotalPages((rsData as { data?: SearchResponse }).data?.totalPages ?? null);
-          setTotalElements(
-            (rsData as { data?: SearchResponse }).data?.totalElements ?? null
-          );
         } else {
           const data = (rsData as { data?: PostPageData }).data;
           setPosts(data?.content ?? []);
           setTotalPages(data?.totalPages ?? null);
-          setTotalElements(data?.totalElements ?? null);
         }
       } catch {
         if (isMounted) {
@@ -180,20 +178,13 @@ export default function PostsPage() {
     return () => {
       isMounted = false;
     };
-  }, [page, sort, statusFilter, keyword, categoryId, categoryInput, pageSize]);
-
-  const applySearch = () => {
-    setKeyword(keywordInput.trim());
-    setPage(0);
-  };
+  }, [page, sort, statusFilter, keyword, categoryId, pageSize]);
 
   const resetFilters = () => {
     setKeywordInput("");
-    setKeyword("");
     setStatusFilter("all");
-    setCategoryInput("");
     setCategoryId(null);
-    setPageSize(10);
+    setSort("LATEST");
     setPage(0);
   };
 
@@ -207,14 +198,13 @@ export default function PostsPage() {
 
   return (
     <div className="page">
-      <div style={{ display: "grid", gap: 24, gridTemplateColumns: "220px 1fr" }}>
-        <aside className="panel" style={{ alignSelf: "start" }}>
+      <div className="catalog-layout">
+        <aside className="panel catalog-sidebar">
           <h2 style={{ marginTop: 0 }}>카테고리</h2>
-          <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+          <div className="category-scroll">
             <button
-              className="card"
+              className="card category-chip"
               style={{
-                textAlign: "left",
                 border:
                   categoryId === null
                     ? "2px solid var(--accent)"
@@ -222,7 +212,6 @@ export default function PostsPage() {
               }}
               onClick={() => {
                 setCategoryId(null);
-                setCategoryInput("");
                 setPage(0);
               }}
             >
@@ -231,9 +220,8 @@ export default function PostsPage() {
             {CATEGORIES.map((item) => (
               <button
                 key={item.id}
-                className="card"
+                className="card category-chip"
                 style={{
-                  textAlign: "left",
                   border:
                     categoryId === item.id
                       ? "2px solid var(--accent)"
@@ -241,7 +229,6 @@ export default function PostsPage() {
                 }}
                 onClick={() => {
                   setCategoryId(item.id);
-                  setCategoryInput(item.name);
                   setPage(0);
                 }}
               >
@@ -253,7 +240,7 @@ export default function PostsPage() {
         <div>
           <section className="panel">
             <h1 style={{ marginTop: 0 }}>중고거래 목록</h1>
-            <div className="field-row" style={{ marginTop: 16 }}>
+            <div className="list-toolbar">
               <div className="field">
                 <label className="label" htmlFor="keyword">
                   검색어
@@ -263,10 +250,7 @@ export default function PostsPage() {
                   className="input"
                   value={keywordInput}
                   onChange={(event) => setKeywordInput(event.target.value)}
-                  placeholder="제목, 내용으로 검색"
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") applySearch();
-                  }}
+                  placeholder="제목 또는 내용 검색"
                 />
               </div>
               <div className="field">
@@ -289,21 +273,6 @@ export default function PostsPage() {
                 </select>
               </div>
               <div className="field">
-                <label className="label" htmlFor="category">
-                  카테고리
-                </label>
-                <input
-                  id="category"
-                  className="input"
-                  value={categoryInput}
-                  onChange={(event) => {
-                    setCategoryInput(event.target.value);
-                    setCategoryId(null);
-                  }}
-                  placeholder="카테고리 입력"
-                />
-              </div>
-              <div className="field">
                 <label className="label" htmlFor="sort">
                   정렬
                 </label>
@@ -311,32 +280,19 @@ export default function PostsPage() {
                   id="sort"
                   className="select"
                   value={sort}
-                  onChange={(event) => setSort(event.target.value)}
+                  onChange={(event) => {
+                    setSort(event.target.value);
+                    setPage(0);
+                  }}
                 >
-                  <option value="LATEST">최신순</option>
-                  <option value="OLDEST">오래된순</option>
+                  <option value="LATEST">최신 등록순</option>
+                  <option value="OLDEST">오래된 등록순</option>
+                  <option value="PRICE_ASC">가격 낮은순</option>
+                  <option value="PRICE_DESC">가격 높은순</option>
                 </select>
-              </div>
-              <div className="field">
-                <label className="label" htmlFor="size">
-                  페이지 크기
-                </label>
-                <input
-                  id="size"
-                  className="input"
-                  type="number"
-                  min={1}
-                  value={pageSize}
-                  onChange={(event) =>
-                    setPageSize(Number(event.target.value) || 10)
-                  }
-                />
               </div>
             </div>
             <div className="actions" style={{ marginTop: 16 }}>
-              <button className="btn btn-primary" onClick={applySearch}>
-                검색 적용
-              </button>
               <button className="btn btn-primary" onClick={handleWrite}>
                 글 작성
               </button>
@@ -357,7 +313,7 @@ export default function PostsPage() {
             ) : visiblePosts.length === 0 ? (
               <EmptyState
                 message={
-                  categoryNameFilter
+                  categoryId !== null
                     ? "해당 카테고리의 게시글이 없습니다."
                     : "검색 결과가 없습니다."
                 }
@@ -365,7 +321,7 @@ export default function PostsPage() {
             ) : (
               <div className="grid-3">
                 {visiblePosts.map((post) => (
-                  <Link key={post.id} className="card" href={`/posts/${post.id}`}>
+                  <Link key={post.id} className="card market-card list-card" href={`/posts/${post.id}`}>
                     <div
                       style={{
                         width: "100%",
@@ -373,7 +329,7 @@ export default function PostsPage() {
                         marginBottom: 12,
                         borderRadius: 12,
                         overflow: "hidden",
-                        background: "var(--surface)",
+                        background: "var(--bg-surface)",
                         border: "1px solid var(--border)",
                         display: "grid",
                         placeItems: "center",
@@ -394,19 +350,21 @@ export default function PostsPage() {
                           }}
                         />
                       ) : (
-                        "썸네일 없음"
+                        <span className="thumb-empty">📦 이미지 준비 중</span>
                       )}
                     </div>
                     <div className="tag">{post.categoryName || "중고거래"}</div>
                     <h3 style={{ margin: "12px 0 6px" }}>{post.title}</h3>
-                    <div className="muted">
-                      {formatNumber(post.price)}원 ·{" "}
-                      {post.statusDisplayName || getPostStatusLabel(post.status)}
+                    <div className="list-price-row">
+                      <span className="list-price">{formatNumber(post.price)}원</span>
+                      <span className="tag">
+                        {post.statusDisplayName || getPostStatusLabel(post.status)}
+                      </span>
                     </div>
-                    <div className="muted" style={{ marginTop: 4 }}>
-                      {formatDateTime(post.createDate)}
+                    <div className="muted list-meta">
+                      등록 {formatDateTime(post.createDate)}
                     </div>
-                    <div className="muted" style={{ marginTop: 6 }}>
+                    <div className="muted list-meta">
                       조회 {formatNumber(post.viewCount)} · 판매자{" "}
                       {post.sellerNickname || "-"}
                     </div>
@@ -420,28 +378,12 @@ export default function PostsPage() {
               </div>
             )}
             {totalPages !== null ? (
-              <div className="actions" style={{ marginTop: 16 }}>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
-                  disabled={page <= 0}
-                >
-                  이전
-                </button>
-                <span className="muted">
-                  {page + 1} / {totalPages} (총 {totalElements ?? 0}건)
-                </span>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() =>
-                    setPage((prev) =>
-                      totalPages ? Math.min(prev + 1, totalPages - 1) : prev + 1
-                    )
-                  }
-                  disabled={totalPages !== null && page >= totalPages - 1}
-                >
-                  다음
-                </button>
+              <div className="pager-wrap">
+                <NumberPagination
+                  page={page}
+                  totalPages={totalPages}
+                  onChange={(nextPage) => setPage(nextPage)}
+                />
               </div>
             ) : null}
           </section>
@@ -450,4 +392,3 @@ export default function PostsPage() {
     </div>
   );
 }
-

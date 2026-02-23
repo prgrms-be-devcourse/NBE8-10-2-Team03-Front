@@ -36,6 +36,35 @@ type PostDetail = {
   viewCount: number;
 };
 
+type PostDetailFetchResult = {
+  rsData: { data: PostDetail } | null;
+  errorMessage: string | null;
+  response: Response;
+};
+
+const inFlightPostDetailRequestById = new Map<
+  number,
+  Promise<PostDetailFetchResult>
+>();
+
+const requestPostDetail = (postId: number) => {
+  const existing = inFlightPostDetailRequestById.get(postId);
+  if (existing) return existing;
+
+  const request = apiRequest<PostDetail>(`/api/v1/posts/${postId}`)
+    .then(({ rsData, errorMessage, response }) => ({
+      rsData: rsData ? { data: rsData.data } : null,
+      errorMessage,
+      response,
+    }))
+    .finally(() => {
+      inFlightPostDetailRequestById.delete(postId);
+    });
+
+  inFlightPostDetailRequestById.set(postId, request);
+  return request;
+};
+
 const resolveImageUrl = (url: string) => {
   if (url.startsWith("http://") || url.startsWith("https://")) {
     return url;
@@ -84,13 +113,14 @@ export default function PostDetailPage() {
       setIsLoading(false);
       return;
     }
+
     let isMounted = true;
     const fetchDetail = async () => {
       setIsLoading(true);
       setErrorMessage(null);
       try {
         const { rsData, errorMessage: apiError, response } =
-          await apiRequest<PostDetail>(`/api/v1/posts/${postId}`);
+          await requestPostDetail(postId);
         if (!isMounted) return;
         if (!response.ok || apiError || !rsData) {
           setPost(null);
@@ -435,8 +465,6 @@ export default function PostDetailPage() {
     </div>
   );
 }
-
-
 
 
 

@@ -54,6 +54,30 @@ type RoomSummary = {
     txType?: "AUCTION" | "POST";
 };
 
+type SocketChatPayload = Partial<ChatDto> & {
+    id?: number;
+    roomId?: string;
+};
+
+type ExitRoomResponse = {
+    resultCode?: string;
+};
+
+type AuctionDetailData = {
+    name?: string;
+    currentHighestBid?: number;
+    startPrice?: number;
+    seller?: { nickname?: string };
+    imageUrls?: string[];
+};
+
+type PostDetailData = {
+    title?: string;
+    price?: number;
+    sellerNickname?: string;
+    imageUrls?: string[];
+};
+
 // ============================================
 // Utilities
 // ============================================
@@ -156,7 +180,7 @@ export default function ChatPage() {
     const roomSubsRef = useRef<Map<string, { unsubscribe: () => void }>>(new Map());
     const readSubRef = useRef<{ unsubscribe: () => void } | null>(null);
     const roomsRef = useRef<RoomSummary[]>([]);
-    const handleRoomMessageRef = useRef<(roomId: string, data: any) => void>(() => {});
+    const handleRoomMessageRef = useRef<(roomId: string, data: SocketChatPayload) => void>(() => {});
     const [isStompConnected, setIsStompConnected] = useState(false);
 
     const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
@@ -177,7 +201,7 @@ export default function ChatPage() {
         if (!selectedRoomId) return;
 
         try {
-            const { rsData, errorMessage } = await apiRequest<any>(`/api/v1/chat/room/${selectedRoomId}/exit`, {
+            const { rsData, errorMessage } = await apiRequest<ExitRoomResponse>(`/api/v1/chat/room/${selectedRoomId}/exit`, {
                 method: "PATCH",
             });
 
@@ -375,14 +399,17 @@ export default function ChatPage() {
     roomsRef.current = rooms;
 
     // 통합 메시지 핸들러 (모든 방의 메시지를 처리)
-    handleRoomMessageRef.current = (roomId: string, data: any) => {
+    handleRoomMessageRef.current = (roomId: string, data: SocketChatPayload) => {
         const currentSelected = selectedRoomIdRef.current;
         const isSelectedRoom = roomId === currentSelected;
 
         const normalized: ChatDto = {
             ...data,
             id: data.id ?? undefined,
+            itemId: data.itemId ?? 0,
             roomId: data.roomId ?? roomId,
+            message: data.message ?? "",
+            createDate: data.createDate ?? new Date().toISOString(),
         };
 
         // 현재 선택된 방: 채팅 메시지 추가
@@ -716,26 +743,30 @@ export default function ChatPage() {
                         ? `/api/v1/auctions/${pendingItemId}`
                         : `/api/v1/posts/${pendingItemId}`;
 
-                const { rsData } = await apiRequest<any>(endpoint);
+                const { rsData } = await apiRequest<AuctionDetailData | PostDetailData>(endpoint);
 
                 if (!isMounted || !rsData?.data) return;
 
                 const data = rsData.data;
-                const itemName = txType === "AUCTION" ? data.name : data.title;
+                const auctionData = txType === "AUCTION" ? (data as AuctionDetailData) : undefined;
+                const postData = txType === "POST" ? (data as PostDetailData) : undefined;
+
+                const itemName = txType === "AUCTION" ? auctionData?.name : postData?.title;
                 const itemPrice =
                     txType === "AUCTION"
-                        ? data.currentHighestBid || data.startPrice
-                        : data.price;
+                        ? auctionData?.currentHighestBid || auctionData?.startPrice
+                        : postData?.price;
 
                 // AuctionDetailResponse has seller.nickname, PostDetailResponse has sellerNickname
                 const opponentNickname = txType === "AUCTION"
-                    ? data.seller?.nickname
-                    : data.sellerNickname;
+                    ? auctionData?.seller?.nickname
+                    : postData?.sellerNickname;
 
                 const finalNickname = opponentNickname || (txType === "AUCTION" ? "판매자" : "상대방");
 
+                const imageUrls = txType === "AUCTION" ? auctionData?.imageUrls : postData?.imageUrls;
                 const itemImageUrl =
-                    data.imageUrls && data.imageUrls.length > 0 ? data.imageUrls[0] : null;
+                    imageUrls && imageUrls.length > 0 ? imageUrls[0] : undefined;
 
                 setRooms((prev) =>
                     prev.map((room) =>
@@ -1229,6 +1260,10 @@ export default function ChatPage() {
 
                             {isMessagesLoading ? (
                                 <div className="chat-loading">불러오는 중...</div>
+                            ) : messagesError ? (
+                                <div className="chat-loading" style={{ color: "var(--danger)" }}>
+                                    {messagesError}
+                                </div>
                             ) : messages.length === 0 ? (
                                 <div className="chat-loading" style={{ color: "var(--text-tertiary, #9ca3af)" }}>첫 메시지를 보내보세요!</div>
                             ) : (

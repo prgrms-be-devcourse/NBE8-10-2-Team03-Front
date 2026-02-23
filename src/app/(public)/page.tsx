@@ -29,6 +29,21 @@ type AuctionPreview = {
   thumbnailUrl?: string;
 };
 
+const getAuctionStatusClassName = (status: string) => {
+  switch (status) {
+    case "OPEN":
+      return "tag-status-open";
+    case "COMPLETED":
+      return "tag-status-completed";
+    case "CLOSED":
+      return "tag-status-closed";
+    case "CANCELLED":
+      return "tag-status-cancelled";
+    default:
+      return "tag-status-open";
+  }
+};
+
 const formatNumber = (value: number | null | undefined) => {
   if (value === null || value === undefined) return "-";
   return value.toLocaleString();
@@ -94,51 +109,41 @@ export default function MainPage() {
 
   return (
     <div className="page">
-      <section className="panel">
-        <h1 style={{ marginTop: 0 }}>오늘의 거래와 경매를 한눈에</h1>
-        <p className="muted">중고거래와 경매를 빠르게 살펴보세요.</p>
-        <div className="grid-2" style={{ marginTop: 20 }}>
-          <Link className="card" href="/posts">
-            <h3 style={{ marginTop: 0 }}>중고거래 보기</h3>
-            <p className="muted">최신 등록 상품을 바로 확인하세요.</p>
+      <section className="panel hero">
+        <div className="hero-eyebrow">고구마 마켓 추천</div>
+        <h1 className="hero-title">따뜻한 이웃 거래, 오늘 바로 시작해 보세요</h1>
+        <p className="hero-desc">
+          우리 동네에서 필요한 물건을 나누고, 경매로 더 좋은 기회를 만나보세요.
+        </p>
+        <div className="hero-cta">
+          <Link className="btn btn-primary" href="/posts">
+            중고거래 시작하기
           </Link>
-          <Link className="card" href="/auctions">
-            <h3 style={{ marginTop: 0 }}>경매 둘러보기</h3>
-            <p className="muted">지금 진행 중인 경매를 모았습니다.</p>
+          <Link className="btn btn-ghost" href="/auctions">
+            진행 중 경매 보기
           </Link>
         </div>
       </section>
 
       <section style={{ marginTop: 28 }}>
         <div className="grid-2">
-          <Card>
+          <Card className="market-card">
             <h2 style={{ marginTop: 0 }}>최신 중고거래</h2>
+            <p className="muted" style={{ marginTop: 6 }}>
+              최근 등록된 따끈한 상품을 먼저 확인해 보세요.
+            </p>
             {isLoading ? (
               <>
                 <SkeletonLine width="60%" />
                 <SkeletonLine width="80%" style={{ marginTop: 12 }} />
               </>
             ) : recentPosts.length === 0 ? (
-              <EmptyState message="표시할 중고거래가 없습니다." />
+              <EmptyState message="🧺 따끈한 상품 준비 중이에요. 잠시 후 다시 확인해 주세요." />
             ) : (
               <div className="grid-3">
                 {recentPosts.slice(0, 3).map((post) => (
-                  <Link key={post.id} className="panel" href={`/posts/${post.id}`}>
-                    <div
-                      style={{
-                        width: "100%",
-                        aspectRatio: "1 / 1",
-                        marginBottom: 12,
-                        borderRadius: 12,
-                        overflow: "hidden",
-                        background: "var(--surface)",
-                        border: "1px solid var(--border)",
-                        display: "grid",
-                        placeItems: "center",
-                        color: "var(--muted)",
-                        fontSize: 12,
-                      }}
-                    >
+                  <Link key={post.id} className="panel market-card" href={`/posts/${post.id}`}>
+                    <div className="thumb-frame">
                       {resolveImageUrl(post.thumbnailUrl) ? (
                         <img
                           src={resolveImageUrl(post.thumbnailUrl) ?? ""}
@@ -152,7 +157,7 @@ export default function MainPage() {
                           }}
                         />
                       ) : (
-                        "썸네일 없음"
+                        <span className="thumb-empty">📦 따뜻한 상품 준비중</span>
                       )}
                     </div>
                     <div className="tag">{post.categoryName}</div>
@@ -163,38 +168,27 @@ export default function MainPage() {
               </div>
             )}
           </Card>
-          <Card>
+          <Card className="market-card">
             <h2 style={{ marginTop: 0 }}>진행 중 경매</h2>
+            <p className="muted" style={{ marginTop: 6 }}>
+              지금 참여 가능한 인기 경매를 빠르게 둘러보세요.
+            </p>
             {isLoading ? (
               <>
                 <SkeletonLine width="60%" />
                 <SkeletonLine width="80%" style={{ marginTop: 12 }} />
               </>
             ) : openAuctions.length === 0 ? (
-              <EmptyState message="진행 중 경매가 없습니다." />
+              <EmptyState message="🍠 진행 중인 경매가 아직 없어요. 곧 새로운 경매가 열릴 예정입니다." />
             ) : (
               <div className="grid-3">
                 {openAuctions.slice(0, 3).map((auction) => (
                   <Link
                     key={auction.auctionId}
-                    className="panel"
+                    className="panel market-card"
                     href={`/auctions/${auction.auctionId}`}
                   >
-                    <div
-                      style={{
-                        width: "100%",
-                        aspectRatio: "1 / 1",
-                        marginBottom: 12,
-                        borderRadius: 12,
-                        overflow: "hidden",
-                        background: "var(--surface)",
-                        border: "1px solid var(--border)",
-                        display: "grid",
-                        placeItems: "center",
-                        color: "var(--muted)",
-                        fontSize: 12,
-                      }}
-                    >
+                    <div className="thumb-frame">
                       {resolveImageUrl(auction.thumbnailUrl) ? (
                         <img
                           src={resolveImageUrl(auction.thumbnailUrl) ?? ""}
@@ -208,13 +202,16 @@ export default function MainPage() {
                           }}
                         />
                       ) : (
-                        "썸네일 없음"
+                        <span className="thumb-empty">🔥 입찰 준비 중</span>
                       )}
                     </div>
-                    <div className="tag">
-                      {auction.categoryName || "경매"}
+                    <div className={`tag tag-status ${getAuctionStatusClassName(auction.status)}`}>
+                      {getAuctionStatusLabel(auction.status)}
                     </div>
                     <h4 style={{ margin: "12px 0 6px" }}>{auction.name}</h4>
+                    <div className="muted" style={{ marginBottom: 4 }}>
+                      카테고리: {auction.categoryName || "경매"}
+                    </div>
                     <div className="muted">
                       현재 최고가{" "}
                       {formatNumber(

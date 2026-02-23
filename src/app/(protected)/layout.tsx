@@ -81,7 +81,10 @@ export default function ProtectedLayout({
           <div className="container header-inner">
             <Link className="logo" href="/" style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "32px" }}>
               <img src="/logo.png" alt="고구마 로고" style={{ height: "40px", width: "auto" }} />
-              고구마 마켓
+              <div>
+                <div>고구마 마켓</div>
+                <div className="brand-subtitle">이웃과 나누는 따뜻한 거래</div>
+              </div>
             </Link>
             <div className="actions">
               {authStatus === "checking" ? (

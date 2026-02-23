@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { AuthProvider, type MemberMe } from "@/components/auth/AuthContext";
 import { resolveImageUrl } from "@/lib/api";
+
+const noopSetMe = () => {};
 
 export default function PublicShell({
   me,
@@ -13,18 +16,29 @@ export default function PublicShell({
   isCheckingAuth: boolean;
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const isPostsActive = pathname?.startsWith("/posts");
+  const isAuctionsActive = pathname?.startsWith("/auctions");
+
   return (
-    <AuthProvider me={me}>
+    <AuthProvider me={me} setMe={noopSetMe}>
       <div className="page">
         <header className="header">
           <div className="container header-inner">
             <Link className="logo" href="/" style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "32px" }}>
               <img src="/logo.png" alt="고구마 로고" style={{ height: "40px", width: "auto" }} />
-              고구마 마켓
+              <div>
+                <div>고구마 마켓</div>
+                <div className="brand-subtitle">이웃과 나누는 따뜻한 거래</div>
+              </div>
             </Link>
             <nav className="nav">
-              <Link href="/posts">중고거래</Link>
-              <Link href="/auctions">경매</Link>
+              <Link href="/posts" className={isPostsActive ? "nav-active" : ""}>
+                중고거래
+              </Link>
+              <Link href="/auctions" className={isAuctionsActive ? "nav-active" : ""}>
+                경매
+              </Link>
             </nav>
             <div className="actions">
               {isCheckingAuth ? (
