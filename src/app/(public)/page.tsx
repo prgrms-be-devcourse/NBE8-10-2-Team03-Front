@@ -109,7 +109,7 @@ export default function MainPage() {
 
   return (
     <div className="page">
-      <section className="panel hero">
+      <section className="panel hero section-enter">
         <div className="hero-eyebrow">고구마 마켓 추천</div>
         <h1 className="hero-title">따뜻한 이웃 거래, 오늘 바로 시작해 보세요</h1>
         <p className="hero-desc">
@@ -125,7 +125,7 @@ export default function MainPage() {
         </div>
       </section>
 
-      <section style={{ marginTop: 28 }}>
+      <section className="section-enter" style={{ marginTop: 28, animationDelay: "70ms" }}>
         <div className="grid-2">
           <Card className="market-card">
             <h2 style={{ marginTop: 0 }}>최신 중고거래</h2>
@@ -141,8 +141,13 @@ export default function MainPage() {
               <EmptyState message="🧺 따끈한 상품 준비 중이에요. 잠시 후 다시 확인해 주세요." />
             ) : (
               <div className="grid-3">
-                {recentPosts.slice(0, 3).map((post) => (
-                  <Link key={post.id} className="panel market-card" href={`/posts/${post.id}`}>
+                {recentPosts.slice(0, 3).map((post, index) => (
+                  <Link
+                    key={post.id}
+                    className="panel market-card list-enter-item"
+                    style={{ animationDelay: `${100 + index * 55}ms` }}
+                    href={`/posts/${post.id}`}
+                  >
                     <div className="thumb-frame">
                       {resolveImageUrl(post.thumbnailUrl) ? (
                         <img
@@ -182,10 +187,11 @@ export default function MainPage() {
               <EmptyState message="🍠 진행 중인 경매가 아직 없어요. 곧 새로운 경매가 열릴 예정입니다." />
             ) : (
               <div className="grid-3">
-                {openAuctions.slice(0, 3).map((auction) => (
+                {openAuctions.slice(0, 3).map((auction, index) => (
                   <Link
                     key={auction.auctionId}
-                    className="panel market-card"
+                    className="panel market-card list-enter-item"
+                    style={{ animationDelay: `${100 + index * 55}ms` }}
                     href={`/auctions/${auction.auctionId}`}
                   >
                     <div className="thumb-frame">

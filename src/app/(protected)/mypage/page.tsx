@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { formatDateTime } from "@/lib/datetime";
+import { formatScore, getScoreBadge } from "@/lib/score";
 
 // Local type definition removed in favor of imported MemberMe
 
@@ -461,6 +462,8 @@ export default function MyPage() {
     return <EmptyState message="사용자 정보를 찾을 수 없습니다." />;
   }
 
+  const myScoreBadge = getScoreBadge(me.score);
+
   return (
     <div className="page">
       <div className="grid-2">
@@ -524,9 +527,14 @@ export default function MyPage() {
           </div>
         </Card>
         <Card>
-          <h2 style={{ marginTop: 0 }}>신뢰도</h2>
+          <h2 style={{ marginTop: 0 }}>고구마 온도</h2>
           <div style={{ fontSize: 32, fontWeight: 700 }}>
-            {me.score === null ? "-" : me.score.toFixed(1)}
+            {formatScore(me.score)}
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <span className={`score-badge score-badge-${myScoreBadge.tone}`}>
+              {myScoreBadge.label}
+            </span>
           </div>
         </Card>
         <Card>

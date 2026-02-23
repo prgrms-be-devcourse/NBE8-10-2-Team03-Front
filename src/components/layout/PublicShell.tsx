@@ -17,6 +17,7 @@ export default function PublicShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const routeKey = pathname ?? "root";
   const isPostsActive = pathname?.startsWith("/posts");
   const isAuctionsActive = pathname?.startsWith("/auctions");
 
@@ -84,7 +85,11 @@ export default function PublicShell({
             </div>
           </div>
         </header>
-        <main className="container fade-in">{children}</main>
+        <main className="container">
+          <div key={routeKey} className="route-enter">
+            {children}
+          </div>
+        </main>
       </div>
     </AuthProvider>
   );

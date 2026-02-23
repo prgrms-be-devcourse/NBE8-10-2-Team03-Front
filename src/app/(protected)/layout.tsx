@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthProvider, type MemberMe } from "@/components/auth/AuthContext";
 import { apiRequest, resolveImageUrl } from "@/lib/api";
@@ -18,6 +18,8 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const routeKey = pathname ?? "protected-root";
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [me, setMe] = useState<MemberMe | null>(null);
   const [globalErrorMessage, setGlobalErrorMessage] = useState<string | null>(
@@ -139,7 +141,11 @@ export default function ProtectedLayout({
             </Panel>
           </main>
         ) : authStatus === "authed" ? (
-          <main className="container fade-in">{children}</main>
+          <main className="container">
+            <div key={routeKey} className="route-enter">
+              {children}
+            </div>
+          </main>
         ) : null}
       </div>
     </AuthProvider>

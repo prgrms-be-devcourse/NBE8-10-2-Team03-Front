@@ -18,6 +18,7 @@ import { Panel } from "@/components/ui/Panel";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { getPostStatusLabel } from "@/lib/status";
 import { formatDateTime } from "@/lib/datetime";
+import { formatScore, getScoreBadge } from "@/lib/score";
 
 type PostDetail = {
   id: number;
@@ -311,6 +312,8 @@ export default function PostDetailPage() {
     return <EmptyState message="존재하지 않는 게시글입니다." />;
   }
 
+  const sellerScoreBadge = getScoreBadge(post.sellerScore);
+
   return (
     <div className="page">
       <section className="grid-2">
@@ -361,7 +364,10 @@ export default function PostDetailPage() {
             </div>
           ) : null}
           <div className="muted" style={{ marginTop: 6 }}>
-            신용 점수 {post.sellerScore ?? "-"}
+            고구마 온도 {formatScore(post.sellerScore)}
+            <span className={`score-badge score-badge-${sellerScoreBadge.tone}`}>
+              {sellerScoreBadge.label}
+            </span>
           </div>
           {post.sellerBadge ? (
             <div className="tag" style={{ marginTop: 8 }}>
@@ -465,8 +471,5 @@ export default function PostDetailPage() {
     </div>
   );
 }
-
-
-
 
 

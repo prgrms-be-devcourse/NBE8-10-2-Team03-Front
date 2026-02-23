@@ -20,6 +20,7 @@ import { Panel } from "@/components/ui/Panel";
 import { SkeletonLine } from "@/components/ui/SkeletonLine";
 import { getAuctionStatusLabel } from "@/lib/status";
 import { formatDateTime } from "@/lib/datetime";
+import { formatScore, getScoreBadge } from "@/lib/score";
 
 type AuctionDetail = {
   auctionId: number;
@@ -499,6 +500,7 @@ export default function AuctionDetailPage() {
   const winningAt = winningBid?.createdAt ?? auction.closedAt ?? null;
   const canStartChat =
     isAuctionCompleted && (isWinner || isSeller) && !!resolvedWinnerId;
+  const sellerScoreBadge = getScoreBadge(auction.seller.reputationScore);
 
   return (
     <div className="page">
@@ -756,8 +758,11 @@ export default function AuctionDetailPage() {
             ) : null}
           </Panel>
           <div style={{ marginTop: 16 }}>
-            판매자 <strong>{auction.seller.nickname}</strong> (평점{" "}
-            {auction.seller.reputationScore})
+            판매자 <strong>{auction.seller.nickname}</strong> (고구마 온도{" "}
+            {formatScore(auction.seller.reputationScore)})
+            <span className={`score-badge score-badge-${sellerScoreBadge.tone}`}>
+              {sellerScoreBadge.label}
+            </span>
           </div>
           {auction.seller.id ? (
             <div className="actions" style={{ marginTop: 8 }}>

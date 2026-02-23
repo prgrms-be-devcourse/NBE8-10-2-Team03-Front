@@ -238,7 +238,7 @@ export default function PostsPage() {
           </div>
         </aside>
         <div>
-          <section className="panel">
+          <section className="panel section-enter">
             <h1 style={{ marginTop: 0 }}>중고거래 목록</h1>
             <div className="list-toolbar">
               <div className="field">
@@ -302,7 +302,7 @@ export default function PostsPage() {
             </div>
           </section>
 
-          <section style={{ marginTop: 24 }}>
+          <section className="section-enter" style={{ marginTop: 24, animationDelay: "70ms" }}>
             {isLoading ? (
               <Card>
                 <SkeletonLine width="70%" />
@@ -320,8 +320,13 @@ export default function PostsPage() {
               />
             ) : (
               <div className="grid-3">
-                {visiblePosts.map((post) => (
-                  <Link key={post.id} className="card market-card list-card" href={`/posts/${post.id}`}>
+                {visiblePosts.map((post, index) => (
+                  <Link
+                    key={post.id}
+                    className="card market-card list-card list-enter-item"
+                    style={{ animationDelay: `${100 + index * 28}ms` }}
+                    href={`/posts/${post.id}`}
+                  >
                     <div
                       style={{
                         width: "100%",
